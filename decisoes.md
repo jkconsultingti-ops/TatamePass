@@ -34,6 +34,10 @@ Em vez do gradiente roxo-azul genérico de SaaS ou do dark-mode-com-neon-accent,
 
 O briefing original definia login com Google como requisito único. A pedido do usuário, adicionamos e-mail/senha como alternativa (tela de login com abas "Entrar"/"Criar conta" + botão do Google). Usa `supabase.auth.signInWithPassword`/`signUp` diretamente, sem tabela ou lógica extra — o Supabase Auth já cobre os dois métodos com a mesma tabela `auth.users`, e o restante do fluxo de onboarding (criar academia / entrar com código) é idêntico para ambos. Cadastro por e-mail fica sujeito à confirmação por e-mail conforme a configuração do projeto Supabase (ligada por padrão).
 
+## Rewrite de SPA no `vercel.json`
+
+Abrir uma rota direta (`/login`, `/aluno`, `/professor` etc) na Vercel sem esse arquivo devolve 404, porque não existe um arquivo físico com esse nome — o roteamento é todo client-side via React Router, só existe depois que o `index.html` carrega o JS. `vercel.json` com um rewrite de qualquer caminho para `/index.html` resolve; sem isso, o app só funciona abrindo exatamente a raiz do domínio.
+
 ## Tailwind v4 com tokens de design customizados
 
 Cores, fontes e nomes semânticos (`hanko`, `mat`, `paper`, `ink`, `rope`, `chalk`) são definidos como CSS custom properties dentro de um bloco `@theme` em `src/index.css`, que o Tailwind v4 transforma automaticamente em utilitários (`bg-hanko`, `text-mat-light` etc). Evita duplicar a paleta em um arquivo de config separado (Tailwind v4 é CSS-first) e mantém os tokens visíveis num único lugar.
