@@ -1,5 +1,13 @@
 export type UserRole = 'aluno' | 'professor'
-export type CampoTipo = 'texto' | 'documento'
+export type CampoTipo =
+  | 'texto_curto'
+  | 'texto_longo'
+  | 'numero'
+  | 'multipla_escolha'
+  | 'caixa_selecao'
+  | 'lista_suspensa'
+  | 'data'
+  | 'documento'
 
 export type Academia = {
   id: string
@@ -55,6 +63,7 @@ export type PerfilCampo = {
   label: string
   tipo: CampoTipo
   obrigatorio: boolean
+  opcoes: string[] | null
   ordem: number
   criado_em: string
 }
@@ -118,3 +127,14 @@ export const DIAS_SEMANA = [
   'Sexta',
   'Sábado',
 ] as const
+
+export const TIPOS_CAMPO: { valor: CampoTipo; rotulo: string; temOpcoes: boolean }[] = [
+  { valor: 'texto_curto', rotulo: 'Texto curto', temOpcoes: false },
+  { valor: 'texto_longo', rotulo: 'Texto longo', temOpcoes: false },
+  { valor: 'numero', rotulo: 'Número', temOpcoes: false },
+  { valor: 'data', rotulo: 'Data', temOpcoes: false },
+  { valor: 'multipla_escolha', rotulo: 'Múltipla escolha', temOpcoes: true },
+  { valor: 'caixa_selecao', rotulo: 'Caixas de seleção', temOpcoes: true },
+  { valor: 'lista_suspensa', rotulo: 'Lista suspensa', temOpcoes: true },
+  { valor: 'documento', rotulo: 'Documento', temOpcoes: false },
+]

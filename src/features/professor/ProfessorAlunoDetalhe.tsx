@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../auth/AuthProvider'
-import { useFormularios, formularioPadrao } from '../../lib/formularios'
+import { useFormularios, formularioPadrao, decodeCaixas } from '../../lib/formularios'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
 import { Badge } from '../../components/Badge'
@@ -199,11 +199,13 @@ export function ProfessorAlunoDetalhe() {
                     {campo.label}
                   </p>
                   <p className="mt-1 text-sm text-chalk">
-                    {campo.tipo === 'texto'
-                      ? resposta?.valor_texto || '—'
-                      : resposta?.arquivo_url
+                    {campo.tipo === 'documento'
+                      ? resposta?.arquivo_url
                         ? 'Documento enviado'
-                        : '—'}
+                        : '—'
+                      : campo.tipo === 'caixa_selecao'
+                        ? decodeCaixas(resposta?.valor_texto).join(', ') || '—'
+                        : resposta?.valor_texto || '—'}
                   </p>
                 </div>
                 {campo.tipo === 'documento' && resposta?.arquivo_url && (

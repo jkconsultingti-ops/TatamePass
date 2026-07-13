@@ -4,8 +4,6 @@ import {
   DndContext,
   PointerSensor,
   closestCenter,
-  useDraggable,
-  useDroppable,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -18,7 +16,10 @@ import { useFormularios } from '../../lib/formularios'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
 import { Badge } from '../../components/Badge'
+import { TIPOS_CAMPO } from '../../types/database'
 import type { CampoTipo, Formulario, PerfilCampo } from '../../types/database'
+
+type CampoPatch = Partial<Pick<PerfilCampo, 'label' | 'obrigatorio' | 'tipo' | 'opcoes'>>
 
 export function ProfessorPerfilForm() {
   const { profile } = useAuth()
@@ -120,7 +121,7 @@ export function ProfessorPerfilForm() {
     await invalidarFormularios()
   }
 
-  async function adicionarCampo(tipo: CampoTipo) {
+  async function adicionarCampo() {
     if (!profile || !formularioSelecionado) return
     setErro(null)
     const { data, error } = await supabase
@@ -128,9 +129,10 @@ export function ProfessorPerfilForm() {
       .insert({
         academia_id: profile.academia_id,
         formulario_id: formularioSelecionado.id,
-        label: tipo === 'texto' ? 'Novo campo de texto' : 'Novo documento',
-        tipo,
+        label: '',
+        tipo: 'texto_curto',
         obrigatorio: false,
+        opcoes: null,
         ordem: campos.length,
       })
       .select()
@@ -143,10 +145,30 @@ export function ProfessorPerfilForm() {
     await invalidarCampos()
   }
 
-  async function atualizarCampo(
-    campo: PerfilCampo,
-    patch: Partial<Pick<PerfilCampo, 'label' | 'obrigatorio'>>,
-  ) {
+  async function duplicarCampo(campo: PerfilCampo) {
+    setErro(null)
+    const { data, error } = await supabase
+      .from('perfil_campos')
+      .insert({
+        academia_id: campo.academia_id,
+        formulario_id: campo.formulario_id,
+        label: campo.label,
+        tipo: campo.tipo,
+        obrigatorio: campo.obrigatorio,
+        opcoes: campo.opcoes,
+        ordem: campos.length,
+      })
+      .select()
+      .single()
+    if (error) {
+      setErro(error.message)
+      return
+    }
+    if (data) setCampoRecemCriado(data.id)
+    await invalidarCampos()
+  }
+
+  async function atualizarCampo(campo: PerfilCampo, patch: CampoPatch) {
     const { error } = await supabase.from('perfil_campos').update(patch).eq('id', campo.id)
     if (error) {
       setErro(error.message)
@@ -158,7 +180,7 @@ export function ProfessorPerfilForm() {
   async function removerCampo(campo: PerfilCampo) {
     if (
       !confirm(
-        `Remover o campo "${campo.label}"? As respostas dos alunos para esse campo também serão apagadas.`,
+        `Remover o campo "${campo.label || 'sem título'}"? As respostas dos alunos para esse campo também serão apagadas.`,
       )
     )
       return
@@ -186,19 +208,11 @@ export function ProfessorPerfilForm() {
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
-    if (!over) return
-
-    if (String(active.id).startsWith('paleta-')) {
-      adicionarCampo(String(active.id) === 'paleta-texto' ? 'texto' : 'documento')
-      return
-    }
-
-    if (active.id !== over.id) {
-      const oldIndex = campos.findIndex((c) => c.id === active.id)
-      const newIndex = campos.findIndex((c) => c.id === over.id)
-      if (oldIndex === -1 || newIndex === -1) return
-      reordenar(arrayMove(campos, oldIndex, newIndex))
-    }
+    if (!over || active.id === over.id) return
+    const oldIndex = campos.findIndex((c) => c.id === active.id)
+    const newIndex = campos.findIndex((c) => c.id === over.id)
+    if (oldIndex === -1 || newIndex === -1) return
+    reordenar(arrayMove(campos, oldIndex, newIndex))
   }
 
   return (
@@ -206,7 +220,7 @@ export function ProfessorPerfilForm() {
       <div>
         <h1 className="font-display text-2xl font-semibold text-chalk">Formulário de perfil</h1>
         <p className="mt-1 text-sm text-rope">
-          Arraste um tipo de campo pro formulário abaixo, ou reordene os campos existentes.
+          Cada pergunta é um cartão — escolha o tipo, arraste pra reordenar.
         </p>
       </div>
 
@@ -251,149 +265,70 @@ export function ProfessorPerfilForm() {
       {erro && <p className="font-mono text-xs text-hanko">{erro}</p>}
 
       {formularioSelecionado && (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <Canvas
-            formulario={formularioSelecionado}
-            campos={campos}
-            campoRecemCriado={campoRecemCriado}
-            onCampoFocado={() => setCampoRecemCriado(null)}
-            onAdicionarCampo={adicionarCampo}
-            onAtualizarCampo={atualizarCampo}
-            onRemoverCampo={removerCampo}
-            onTornarPadrao={() => tornarPadrao(formularioSelecionado)}
-            onExcluirFormulario={() => excluirFormulario(formularioSelecionado)}
-            podeExcluir={!formularioSelecionado.padrao && formularios.length > 1}
-          />
-        </DndContext>
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <h2 className="font-display text-lg text-chalk">{formularioSelecionado.nome}</h2>
+              {formularioSelecionado.padrao && <Badge tone="hanko">padrão</Badge>}
+            </div>
+            <div className="flex gap-2">
+              {!formularioSelecionado.padrao && (
+                <Button variant="secondary" onClick={() => tornarPadrao(formularioSelecionado)}>
+                  Tornar padrão
+                </Button>
+              )}
+              {!formularioSelecionado.padrao && formularios.length > 1 && (
+                <Button variant="ghost" onClick={() => excluirFormulario(formularioSelecionado)}>
+                  Excluir formulário
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={campos.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+              <div className="flex flex-col gap-4">
+                {campos.map((campo) => (
+                  <CampoCard
+                    key={campo.id}
+                    campo={campo}
+                    autoFocar={campoRecemCriado === campo.id}
+                    onFocado={() => setCampoRecemCriado(null)}
+                    onAtualizar={(patch) => atualizarCampo(campo, patch)}
+                    onDuplicar={() => duplicarCampo(campo)}
+                    onRemover={() => removerCampo(campo)}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+
+          <button
+            type="button"
+            onClick={adicionarCampo}
+            className="rounded-md border border-dashed border-rope-dim/40 py-4 text-center font-mono text-xs uppercase tracking-wide text-rope transition-colors hover:border-hanko hover:text-hanko"
+          >
+            + Adicionar pergunta
+          </button>
+        </>
       )}
     </div>
   )
 }
 
-function Canvas({
-  formulario,
-  campos,
-  campoRecemCriado,
-  onCampoFocado,
-  onAdicionarCampo,
-  onAtualizarCampo,
-  onRemoverCampo,
-  onTornarPadrao,
-  onExcluirFormulario,
-  podeExcluir,
-}: {
-  formulario: Formulario
-  campos: PerfilCampo[]
-  campoRecemCriado: string | null
-  onCampoFocado: () => void
-  onAdicionarCampo: (tipo: CampoTipo) => void
-  onAtualizarCampo: (
-    campo: PerfilCampo,
-    patch: Partial<Pick<PerfilCampo, 'label' | 'obrigatorio'>>,
-  ) => void
-  onRemoverCampo: (campo: PerfilCampo) => void
-  onTornarPadrao: () => void
-  onExcluirFormulario: () => void
-  podeExcluir: boolean
-}) {
-  const { setNodeRef, isOver } = useDroppable({ id: 'canvas' })
-
-  return (
-    <Card ref={setNodeRef} className={isOver ? 'border-hanko/60 bg-hanko/5' : undefined}>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rope-dim/15 pb-4">
-        <div className="flex items-center gap-2">
-          <h2 className="font-display text-lg text-chalk">{formulario.nome}</h2>
-          {formulario.padrao && <Badge tone="hanko">padrão</Badge>}
-        </div>
-        <div className="flex gap-2">
-          {!formulario.padrao && (
-            <Button variant="secondary" onClick={onTornarPadrao}>
-              Tornar padrão
-            </Button>
-          )}
-          {podeExcluir && (
-            <Button variant="ghost" onClick={onExcluirFormulario}>
-              Excluir formulário
-            </Button>
-          )}
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-2 border-b border-rope-dim/15 py-4">
-        <PaletaChip id="paleta-texto" label="Texto" onAdicionar={() => onAdicionarCampo('texto')} />
-        <PaletaChip
-          id="paleta-documento"
-          label="Documento"
-          onAdicionar={() => onAdicionarCampo('documento')}
-        />
-      </div>
-
-      <SortableContext items={campos.map((c) => c.id)} strategy={verticalListSortingStrategy}>
-        <div className="flex flex-col divide-y divide-rope-dim/15">
-          {campos.map((campo) => (
-            <CampoRow
-              key={campo.id}
-              campo={campo}
-              autoFocar={campoRecemCriado === campo.id}
-              onFocado={onCampoFocado}
-              onAtualizar={(patch) => onAtualizarCampo(campo, patch)}
-              onRemover={() => onRemoverCampo(campo)}
-            />
-          ))}
-        </div>
-      </SortableContext>
-
-      {campos.length === 0 && (
-        <p className="py-6 text-center text-sm text-rope">
-          Arraste "Texto" ou "Documento" aqui pra criar o primeiro campo.
-        </p>
-      )}
-    </Card>
-  )
-}
-
-function PaletaChip({
-  id,
-  label,
-  onAdicionar,
-}: {
-  id: string
-  label: string
-  onAdicionar: () => void
-}) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id })
-  const style = transform
-    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
-    : undefined
-
-  return (
-    <button
-      type="button"
-      ref={setNodeRef}
-      style={style}
-      onClick={onAdicionar}
-      {...listeners}
-      {...attributes}
-      className={`touch-none select-none rounded-full border border-dashed border-rope-dim/60 px-3.5 py-1.5 font-mono text-xs uppercase tracking-wide text-rope transition-colors ${
-        isDragging ? 'cursor-grabbing opacity-40' : 'cursor-grab hover:border-hanko hover:text-hanko'
-      }`}
-    >
-      + {label}
-    </button>
-  )
-}
-
-function CampoRow({
+function CampoCard({
   campo,
   autoFocar,
   onFocado,
   onAtualizar,
+  onDuplicar,
   onRemover,
 }: {
   campo: PerfilCampo
   autoFocar: boolean
   onFocado: () => void
-  onAtualizar: (patch: Partial<Pick<PerfilCampo, 'label' | 'obrigatorio'>>) => void
+  onAtualizar: (patch: CampoPatch) => void
+  onDuplicar: () => void
   onRemover: () => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -407,47 +342,185 @@ function CampoRow({
   useEffect(() => {
     if (autoFocar && inputRef.current) {
       inputRef.current.focus()
-      inputRef.current.select()
       onFocado()
     }
   }, [autoFocar, onFocado])
 
   const style = { transform: CSS.Transform.toString(transform), transition }
 
+  function mudarTipo(novoTipo: CampoTipo) {
+    const novoMeta = TIPOS_CAMPO.find((t) => t.valor === novoTipo)
+    if (novoMeta?.temOpcoes) {
+      onAtualizar({
+        tipo: novoTipo,
+        opcoes: campo.opcoes && campo.opcoes.length > 0 ? campo.opcoes : ['Opção 1'],
+      })
+    } else {
+      onAtualizar({ tipo: novoTipo, opcoes: null })
+    }
+  }
+
+  function mudarOpcao(indice: number, valor: string) {
+    const novas = [...(campo.opcoes ?? [])]
+    novas[indice] = valor
+    onAtualizar({ opcoes: novas })
+  }
+
+  function adicionarOpcao() {
+    onAtualizar({ opcoes: [...(campo.opcoes ?? []), `Opção ${(campo.opcoes?.length ?? 0) + 1}`] })
+  }
+
+  function removerOpcao(indice: number) {
+    onAtualizar({ opcoes: (campo.opcoes ?? []).filter((_, i) => i !== indice) })
+  }
+
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`flex flex-wrap items-center gap-3 py-3 ${isDragging ? 'opacity-50' : ''}`}
-    >
-      <button
-        type="button"
-        {...attributes}
-        {...listeners}
-        className="touch-none cursor-grab px-1 text-rope-dim hover:text-rope active:cursor-grabbing"
-        aria-label="Arrastar para reordenar"
-      >
-        ⠿
-      </button>
-      <input
-        ref={inputRef}
-        value={label}
-        onChange={(e) => setLabel(e.target.value)}
-        onBlur={() => label.trim() && label !== campo.label && onAtualizar({ label: label.trim() })}
-        className="min-w-40 flex-1 rounded-sm border border-transparent bg-transparent px-1.5 py-1 text-sm text-chalk hover:border-rope-dim/40 focus:border-hanko focus:outline-none"
-      />
-      <Badge>{campo.tipo}</Badge>
-      <label className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wide text-rope">
+    <Card ref={setNodeRef} style={style} className={isDragging ? 'opacity-50' : undefined}>
+      <div className="flex items-start gap-2">
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          className="mt-2 touch-none cursor-grab px-1 text-rope-dim hover:text-rope active:cursor-grabbing"
+          aria-label="Arrastar para reordenar"
+        >
+          ⠿
+        </button>
         <input
-          type="checkbox"
-          checked={campo.obrigatorio}
-          onChange={(e) => onAtualizar({ obrigatorio: e.target.checked })}
+          ref={inputRef}
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          onBlur={() => label.trim() !== campo.label && onAtualizar({ label: label.trim() })}
+          placeholder="Pergunta"
+          className="flex-1 border-b border-transparent bg-transparent px-1 py-1.5 font-display text-lg text-chalk hover:border-rope-dim/40 focus:border-hanko focus:outline-none"
         />
-        obrigatório
-      </label>
-      <Button variant="ghost" onClick={onRemover}>
-        ✕
-      </Button>
-    </div>
+        <select
+          value={campo.tipo}
+          onChange={(e) => mudarTipo(e.target.value as CampoTipo)}
+          className="rounded-sm border border-rope-dim/50 bg-ink px-2.5 py-1.5 text-xs text-chalk focus:border-hanko focus:outline-none"
+        >
+          {TIPOS_CAMPO.map((t) => (
+            <option key={t.valor} value={t.valor}>
+              {t.rotulo}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="mt-3 pl-7">
+        <CampoPreview
+          campo={campo}
+          onMudarOpcao={mudarOpcao}
+          onAdicionarOpcao={adicionarOpcao}
+          onRemoverOpcao={removerOpcao}
+        />
+      </div>
+
+      <div className="mt-4 flex items-center justify-end gap-4 border-t border-rope-dim/15 pt-3">
+        <label className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wide text-rope">
+          <input
+            type="checkbox"
+            checked={campo.obrigatorio}
+            onChange={(e) => onAtualizar({ obrigatorio: e.target.checked })}
+          />
+          obrigatório
+        </label>
+        <button type="button" onClick={onDuplicar} className="text-rope hover:text-chalk" aria-label="Duplicar pergunta">
+          ⧉
+        </button>
+        <button type="button" onClick={onRemover} className="text-rope hover:text-hanko" aria-label="Excluir pergunta">
+          🗑
+        </button>
+      </div>
+    </Card>
   )
+}
+
+function CampoPreview({
+  campo,
+  onMudarOpcao,
+  onAdicionarOpcao,
+  onRemoverOpcao,
+}: {
+  campo: PerfilCampo
+  onMudarOpcao: (indice: number, valor: string) => void
+  onAdicionarOpcao: () => void
+  onRemoverOpcao: (indice: number) => void
+}) {
+  const meta = TIPOS_CAMPO.find((t) => t.valor === campo.tipo)
+
+  if (meta?.temOpcoes) {
+    return (
+      <div className="flex flex-col gap-2">
+        {(campo.opcoes ?? []).map((opcao, indice) => (
+          <div key={indice} className="flex items-center gap-2">
+            <span className="w-4 text-center text-rope-dim">
+              {campo.tipo === 'lista_suspensa' ? `${indice + 1}.` : campo.tipo === 'caixa_selecao' ? '☐' : '○'}
+            </span>
+            <input
+              value={opcao}
+              onChange={(e) => onMudarOpcao(indice, e.target.value)}
+              className="flex-1 rounded-sm border border-rope-dim/30 bg-ink px-2.5 py-1.5 text-sm text-chalk focus:border-hanko focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => onRemoverOpcao(indice)}
+              className="text-rope-dim hover:text-hanko"
+              aria-label="Remover opção"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={onAdicionarOpcao}
+          className="ml-6 self-start font-mono text-xs text-rope hover:text-hanko"
+        >
+          + Adicionar opção
+        </button>
+      </div>
+    )
+  }
+
+  switch (campo.tipo) {
+    case 'texto_curto':
+      return (
+        <input
+          disabled
+          placeholder="Texto de resposta curta"
+          className="w-full max-w-sm rounded-sm border border-rope-dim/25 bg-transparent px-2.5 py-1.5 text-sm text-rope-dim"
+        />
+      )
+    case 'texto_longo':
+      return (
+        <textarea
+          disabled
+          placeholder="Texto de resposta longa"
+          rows={2}
+          className="w-full rounded-sm border border-rope-dim/25 bg-transparent px-2.5 py-1.5 text-sm text-rope-dim"
+        />
+      )
+    case 'numero':
+      return (
+        <input
+          disabled
+          type="number"
+          placeholder="0"
+          className="w-32 rounded-sm border border-rope-dim/25 bg-transparent px-2.5 py-1.5 text-sm text-rope-dim"
+        />
+      )
+    case 'data':
+      return (
+        <input
+          disabled
+          type="date"
+          className="w-44 rounded-sm border border-rope-dim/25 bg-transparent px-2.5 py-1.5 text-sm text-rope-dim"
+        />
+      )
+    case 'documento':
+      return <p className="font-mono text-xs text-rope-dim">📎 anexo enviado pelo aluno</p>
+    default:
+      return null
+  }
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../auth/AuthProvider'
-import { useFormularios, formularioPadrao } from '../../lib/formularios'
+import { useFormularios, formularioPadrao, decodeCaixas, encodeCaixas } from '../../lib/formularios'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
 import { Label, Input, Textarea } from '../../components/Field'
@@ -122,6 +122,35 @@ export function AlunoPerfil() {
     }
   }
 
+  async function salvarValorDireto(campo: PerfilCampo, valor: string) {
+    if (!profile) return
+    setMensagem(null)
+    try {
+      const { error } = await supabase
+        .from('perfil_respostas')
+        .upsert(
+          { aluno_id: profile.id, campo_id: campo.id, valor_texto: valor },
+          { onConflict: 'aluno_id,campo_id' },
+        )
+      if (error) throw error
+    } catch (err) {
+      setMensagem(err instanceof Error ? err.message : 'Não foi possível salvar')
+    }
+  }
+
+  function salvarEscolha(campo: PerfilCampo, valor: string) {
+    setValores((v) => ({ ...v, [campo.id]: valor }))
+    salvarValorDireto(campo, valor)
+  }
+
+  function alternarCaixa(campo: PerfilCampo, opcao: string, marcado: boolean) {
+    const atuais = decodeCaixas(valores[campo.id])
+    const novas = marcado ? [...atuais, opcao] : atuais.filter((o) => o !== opcao)
+    const codificado = encodeCaixas(novas)
+    setValores((v) => ({ ...v, [campo.id]: codificado }))
+    salvarValorDireto(campo, codificado)
+  }
+
   async function enviarDocumento(campo: PerfilCampo, arquivo: File) {
     if (!profile) return
     setUploadCampo(campo.id)
@@ -234,7 +263,28 @@ export function AlunoPerfil() {
             {campo.label}
             {campo.obrigatorio ? ' *' : ''}
           </Label>
-          {campo.tipo === 'texto' ? (
+
+          {(campo.tipo === 'texto_curto' || campo.tipo === 'numero' || campo.tipo === 'data') && (
+            <div className="flex flex-col gap-2">
+              <Input
+                id={campo.id}
+                type={campo.tipo === 'numero' ? 'number' : campo.tipo === 'data' ? 'date' : 'text'}
+                value={valores[campo.id] ?? ''}
+                onChange={(e) => setValores((v) => ({ ...v, [campo.id]: e.target.value }))}
+                className="max-w-sm"
+              />
+              <Button
+                variant="secondary"
+                onClick={() => salvarTexto(campo)}
+                disabled={salvandoCampo === campo.id}
+                className="self-start"
+              >
+                {salvandoCampo === campo.id ? 'Salvando…' : 'Salvar'}
+              </Button>
+            </div>
+          )}
+
+          {campo.tipo === 'texto_longo' && (
             <div className="flex flex-col gap-2">
               <Textarea
                 id={campo.id}
@@ -250,7 +300,56 @@ export function AlunoPerfil() {
                 {salvandoCampo === campo.id ? 'Salvando…' : 'Salvar'}
               </Button>
             </div>
-          ) : (
+          )}
+
+          {campo.tipo === 'multipla_escolha' && (
+            <div className="flex flex-col gap-2">
+              {(campo.opcoes ?? []).map((opcao) => (
+                <label key={opcao} className="flex items-center gap-2 text-sm text-chalk">
+                  <input
+                    type="radio"
+                    name={campo.id}
+                    checked={valores[campo.id] === opcao}
+                    onChange={() => salvarEscolha(campo, opcao)}
+                  />
+                  {opcao}
+                </label>
+              ))}
+            </div>
+          )}
+
+          {campo.tipo === 'caixa_selecao' && (
+            <div className="flex flex-col gap-2">
+              {(campo.opcoes ?? []).map((opcao) => (
+                <label key={opcao} className="flex items-center gap-2 text-sm text-chalk">
+                  <input
+                    type="checkbox"
+                    checked={decodeCaixas(valores[campo.id]).includes(opcao)}
+                    onChange={(e) => alternarCaixa(campo, opcao, e.target.checked)}
+                  />
+                  {opcao}
+                </label>
+              ))}
+            </div>
+          )}
+
+          {campo.tipo === 'lista_suspensa' && (
+            <select
+              id={campo.id}
+              value={valores[campo.id] ?? ''}
+              onChange={(e) => salvarEscolha(campo, e.target.value)}
+              className="w-full max-w-sm rounded-sm border border-rope-dim/50 bg-ink px-3.5 py-2.5 text-sm text-chalk focus:border-hanko focus:outline-none focus:ring-1 focus:ring-hanko"
+            >
+              <option value="">Selecione</option>
+              {(campo.opcoes ?? []).map((opcao) => (
+                <option key={opcao} value={opcao}>
+                  {opcao}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {campo.tipo === 'documento' && (
             <div className="flex flex-col gap-2">
               {documentoExistente(campo.id) && (
                 <p className="font-mono text-xs text-mat-light">Documento enviado ✓</p>
