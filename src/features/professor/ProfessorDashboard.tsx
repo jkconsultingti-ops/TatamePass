@@ -1,16 +1,19 @@
 import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../auth/AuthProvider'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
 import { hojeISO } from '../../lib/checkin'
-import type { Profile, Checkin, Turma, Academia } from '../../types/database'
+import { useAulasCanceladas, aulaCanceladaEm } from '../../lib/aulas'
+import type { Profile, Checkin, Turma, Academia, AulaCancelada } from '../../types/database'
 
 export function ProfessorDashboard() {
   const { profile } = useAuth()
+  const queryClient = useQueryClient()
   const [copiado, setCopiado] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
 
   const academiaQuery = useQuery({
     queryKey: ['academia', profile?.academia_id],
@@ -56,10 +59,43 @@ export function ProfessorDashboard() {
     enabled: !!profile,
   })
 
+  const canceladasQuery = useAulasCanceladas(profile?.academia_id)
+
   const turmasHoje = useMemo(() => {
     const hoje = new Date().getDay()
     return (turmasQuery.data ?? []).filter((t) => t.dias_semana.includes(hoje))
   }, [turmasQuery.data])
+
+  async function invalidarCanceladas() {
+    await queryClient.invalidateQueries({ queryKey: ['aulas_canceladas', profile?.academia_id] })
+  }
+
+  async function cancelarAulaHoje(turma: Turma, motivo: string) {
+    if (!profile || !motivo.trim()) return
+    setErro(null)
+    const { error } = await supabase.from('aulas_canceladas').insert({
+      turma_id: turma.id,
+      academia_id: profile.academia_id,
+      data: hojeISO(),
+      motivo: motivo.trim(),
+      cancelado_por: profile.id,
+    })
+    if (error) {
+      setErro(error.message)
+      return
+    }
+    await invalidarCanceladas()
+  }
+
+  async function desfazerCancelamento(cancelada: AulaCancelada) {
+    setErro(null)
+    const { error } = await supabase.from('aulas_canceladas').delete().eq('id', cancelada.id)
+    if (error) {
+      setErro(error.message)
+      return
+    }
+    await invalidarCanceladas()
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -109,15 +145,17 @@ export function ProfessorDashboard() {
         <h2 className="font-mono text-xs uppercase tracking-[0.14em] text-rope">Aulas de hoje</h2>
         <div className="mt-3 flex flex-col gap-2">
           {turmasHoje.map((t) => (
-            <Card key={t.id} className="flex items-center justify-between">
-              <p className="text-sm text-chalk">{t.nome}</p>
-              <p className="font-mono text-xs text-rope">
-                {t.horario_inicio.slice(0, 5)}–{t.horario_fim.slice(0, 5)}
-              </p>
-            </Card>
+            <AulaHojeCard
+              key={t.id}
+              turma={t}
+              cancelada={aulaCanceladaEm(canceladasQuery.data, t.id, hojeISO())}
+              onCancelar={(motivo) => cancelarAulaHoje(t, motivo)}
+              onDesfazer={(cancelada) => desfazerCancelamento(cancelada)}
+            />
           ))}
           {turmasHoje.length === 0 && <Card className="text-sm text-rope">Nenhuma turma hoje.</Card>}
         </div>
+        {erro && <p className="mt-2 font-mono text-xs text-hanko">{erro}</p>}
       </section>
 
       <div className="flex gap-4">
@@ -129,5 +167,63 @@ export function ProfessorDashboard() {
         </Link>
       </div>
     </div>
+  )
+}
+
+function AulaHojeCard({
+  turma,
+  cancelada,
+  onCancelar,
+  onDesfazer,
+}: {
+  turma: Turma
+  cancelada: AulaCancelada | undefined
+  onCancelar: (motivo: string) => void
+  onDesfazer: (cancelada: AulaCancelada) => void
+}) {
+  const [cancelando, setCancelando] = useState(false)
+
+  if (cancelada) {
+    return (
+      <Card className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-sm text-chalk">{turma.nome}</p>
+          <p className="font-mono text-xs text-hanko">Cancelada — {cancelada.motivo}</p>
+        </div>
+        <Button variant="ghost" onClick={() => onDesfazer(cancelada)}>
+          Desfazer
+        </Button>
+      </Card>
+    )
+  }
+
+  return (
+    <Card className="flex items-center justify-between gap-4">
+      <div>
+        <p className="text-sm text-chalk">{turma.nome}</p>
+        <p className="font-mono text-xs text-rope">
+          {turma.horario_inicio.slice(0, 5)}–{turma.horario_fim.slice(0, 5)}
+        </p>
+      </div>
+      {cancelando ? (
+        <input
+          autoFocus
+          placeholder="Motivo (ex: feriado)"
+          className="w-48 rounded-sm border border-rope-dim/50 bg-ink px-2.5 py-1.5 text-sm text-chalk focus:border-hanko focus:outline-none"
+          onBlur={(e) => {
+            if (e.target.value.trim()) onCancelar(e.target.value)
+            setCancelando(false)
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur()
+            if (e.key === 'Escape') setCancelando(false)
+          }}
+        />
+      ) : (
+        <Button variant="ghost" onClick={() => setCancelando(true)}>
+          Cancelar aula de hoje
+        </Button>
+      )}
+    </Card>
   )
 }

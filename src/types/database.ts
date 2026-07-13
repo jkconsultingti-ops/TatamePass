@@ -89,6 +89,16 @@ export type Graduacao = {
   criado_em: string
 }
 
+export type AulaCancelada = {
+  id: string
+  turma_id: string
+  academia_id: string
+  data: string
+  motivo: string
+  cancelado_por: string
+  criado_em: string
+}
+
 type TableOf<Row> = { Row: Row; Insert: Partial<Row>; Update: Partial<Row>; Relationships: [] }
 
 export type Database = {
@@ -102,6 +112,7 @@ export type Database = {
       perfil_campos: TableOf<PerfilCampo>
       perfil_respostas: TableOf<PerfilResposta>
       graduacoes: TableOf<Graduacao>
+      aulas_canceladas: TableOf<AulaCancelada>
     }
     Views: Record<string, never>
     Functions: {

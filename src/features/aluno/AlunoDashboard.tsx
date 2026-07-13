@@ -4,11 +4,12 @@ import { format } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../auth/AuthProvider'
 import { statusCheckin, hojeISO } from '../../lib/checkin'
+import { useAulasCanceladas, aulaCanceladaEm } from '../../lib/aulas'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
 import { Badge } from '../../components/Badge'
 import { Stamp } from '../../components/Stamp'
-import type { Turma, Checkin, Graduacao } from '../../types/database'
+import type { Turma, Checkin, Graduacao, AulaCancelada } from '../../types/database'
 
 export function AlunoDashboard() {
   const { profile } = useAuth()
@@ -40,6 +41,8 @@ export function AlunoDashboard() {
     },
     enabled: !!profile,
   })
+
+  const canceladasQuery = useAulasCanceladas(profile?.academia_id)
 
   const graduacoesQuery = useQuery({
     queryKey: ['graduacoes', profile?.id],
@@ -88,6 +91,26 @@ export function AlunoDashboard() {
     }
   }
 
+  async function cancelarCheckin(turma: Turma) {
+    if (!profile) return
+    setErro(null)
+    setMarcando(turma.id)
+    try {
+      const { error } = await supabase
+        .from('checkins')
+        .delete()
+        .eq('aluno_id', profile.id)
+        .eq('turma_id', turma.id)
+        .eq('data', hojeISO())
+      if (error) throw error
+      await queryClient.invalidateQueries({ queryKey: ['checkins', profile.id] })
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : 'Não foi possível cancelar o check-in')
+    } finally {
+      setMarcando(null)
+    }
+  }
+
   const faixaAtual = graduacoesQuery.data?.[0]
 
   return (
@@ -123,8 +146,10 @@ export function AlunoDashboard() {
               turma={turma}
               principal={profile?.turma_principal_id === turma.id}
               jaFezCheckin={checkinsHoje.has(turma.id)}
+              cancelada={aulaCanceladaEm(canceladasQuery.data, turma.id, hojeISO())}
               carregando={marcando === turma.id}
               onCheckin={() => fazerCheckin(turma)}
+              onCancelarCheckin={() => cancelarCheckin(turma)}
             />
           ))}
         </div>
@@ -159,14 +184,18 @@ function TurmaCheckinCard({
   turma,
   principal,
   jaFezCheckin,
+  cancelada,
   carregando,
   onCheckin,
+  onCancelarCheckin,
 }: {
   turma: Turma
   principal: boolean
   jaFezCheckin: boolean
+  cancelada: AulaCancelada | undefined
   carregando: boolean
   onCheckin: () => void
+  onCancelarCheckin: () => void
 }) {
   const status = statusCheckin(turma)
   return (
@@ -181,7 +210,14 @@ function TurmaCheckinCard({
         </p>
       </div>
       {jaFezCheckin ? (
-        <Stamp className="h-10 w-10 shrink-0 text-mat-light" />
+        <div className="flex items-center gap-2">
+          <Stamp className="h-10 w-10 shrink-0 text-mat-light" />
+          <Button variant="ghost" onClick={onCancelarCheckin} disabled={carregando}>
+            Cancelar
+          </Button>
+        </div>
+      ) : cancelada ? (
+        <Badge tone="hanko">Cancelada — {cancelada.motivo}</Badge>
       ) : status.disponivel ? (
         <Button onClick={onCheckin} disabled={carregando}>
           {carregando ? 'Carimbando…' : 'Check-in'}

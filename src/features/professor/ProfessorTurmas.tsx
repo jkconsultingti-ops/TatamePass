@@ -8,8 +8,10 @@ import { useAuth } from '../../auth/AuthProvider'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
 import { Label, Input, FieldError } from '../../components/Field'
+import { hojeISO } from '../../lib/checkin'
+import { useAulasCanceladas } from '../../lib/aulas'
 import { DIAS_SEMANA } from '../../types/database'
-import type { Turma } from '../../types/database'
+import type { Turma, AulaCancelada } from '../../types/database'
 
 const turmaSchema = z.object({
   nome: z.string().min(2, 'Informe o nome da turma'),
@@ -39,6 +41,8 @@ export function ProfessorTurmas() {
     enabled: !!profile,
   })
 
+  const canceladasQuery = useAulasCanceladas(profile?.academia_id)
+
   async function excluir(turma: Turma) {
     if (!confirm(`Excluir a turma "${turma.nome}"?`)) return
     const { error } = await supabase.from('turmas').delete().eq('id', turma.id)
@@ -47,6 +51,33 @@ export function ProfessorTurmas() {
       return
     }
     await queryClient.invalidateQueries({ queryKey: ['turmas', profile?.academia_id] })
+  }
+
+  async function cancelarData(turma: Turma, data: string, motivo: string) {
+    if (!profile || !data || !motivo.trim()) return
+    setErro(null)
+    const { error } = await supabase.from('aulas_canceladas').insert({
+      turma_id: turma.id,
+      academia_id: profile.academia_id,
+      data,
+      motivo: motivo.trim(),
+      cancelado_por: profile.id,
+    })
+    if (error) {
+      setErro(error.message)
+      return
+    }
+    await queryClient.invalidateQueries({ queryKey: ['aulas_canceladas', profile.academia_id] })
+  }
+
+  async function desfazerCancelamento(cancelada: AulaCancelada) {
+    setErro(null)
+    const { error } = await supabase.from('aulas_canceladas').delete().eq('id', cancelada.id)
+    if (error) {
+      setErro(error.message)
+      return
+    }
+    await queryClient.invalidateQueries({ queryKey: ['aulas_canceladas', profile?.academia_id] })
   }
 
   return (
@@ -75,30 +106,126 @@ export function ProfessorTurmas() {
 
       <div className="flex flex-col gap-3">
         {turmasQuery.data?.map((turma) => (
-          <Card key={turma.id} className="flex items-center justify-between gap-4">
-            <div>
-              <p className="font-medium text-chalk">{turma.nome}</p>
-              <p className="font-mono text-xs text-rope">
-                {turma.dias_semana.map((d) => DIAS_SEMANA[d].slice(0, 3)).join(', ')} ·{' '}
-                {turma.horario_inicio.slice(0, 5)}–{turma.horario_fim.slice(0, 5)} · check-in{' '}
-                {turma.janela_checkin_antes_horas}h antes – {turma.janela_checkin_depois_horas}h depois
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="secondary" onClick={() => setEditando(turma)}>
-                Editar
-              </Button>
-              <Button variant="ghost" onClick={() => excluir(turma)}>
-                Excluir
-              </Button>
-            </div>
-          </Card>
+          <TurmaCard
+            key={turma.id}
+            turma={turma}
+            cancelamentosFuturos={(canceladasQuery.data ?? []).filter(
+              (c) => c.turma_id === turma.id && c.data >= hojeISO(),
+            )}
+            onEditar={() => setEditando(turma)}
+            onExcluir={() => excluir(turma)}
+            onCancelarData={(data, motivo) => cancelarData(turma, data, motivo)}
+            onDesfazerCancelamento={desfazerCancelamento}
+          />
         ))}
         {turmasQuery.data?.length === 0 && (
           <Card className="text-sm text-rope">Nenhuma turma cadastrada.</Card>
         )}
       </div>
     </div>
+  )
+}
+
+function TurmaCard({
+  turma,
+  cancelamentosFuturos,
+  onEditar,
+  onExcluir,
+  onCancelarData,
+  onDesfazerCancelamento,
+}: {
+  turma: Turma
+  cancelamentosFuturos: AulaCancelada[]
+  onEditar: () => void
+  onExcluir: () => void
+  onCancelarData: (data: string, motivo: string) => void
+  onDesfazerCancelamento: (cancelada: AulaCancelada) => void
+}) {
+  const [cancelandoData, setCancelandoData] = useState(false)
+  const [data, setData] = useState('')
+  const [motivo, setMotivo] = useState('')
+
+  return (
+    <Card className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="font-medium text-chalk">{turma.nome}</p>
+          <p className="font-mono text-xs text-rope">
+            {turma.dias_semana.map((d) => DIAS_SEMANA[d].slice(0, 3)).join(', ')} ·{' '}
+            {turma.horario_inicio.slice(0, 5)}–{turma.horario_fim.slice(0, 5)} · check-in{' '}
+            {turma.janela_checkin_antes_horas}h antes – {turma.janela_checkin_depois_horas}h depois
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={onEditar}>
+            Editar
+          </Button>
+          <Button variant="ghost" onClick={onExcluir}>
+            Excluir
+          </Button>
+        </div>
+      </div>
+
+      {cancelamentosFuturos.length > 0 && (
+        <div className="flex flex-col gap-1 border-t border-rope-dim/15 pt-3">
+          {cancelamentosFuturos.map((c) => (
+            <div key={c.id} className="flex items-center justify-between gap-3">
+              <p className="font-mono text-xs text-hanko">
+                {c.data} — {c.motivo}
+              </p>
+              <Button variant="ghost" onClick={() => onDesfazerCancelamento(c)}>
+                Desfazer
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="border-t border-rope-dim/15 pt-3">
+        {cancelandoData ? (
+          <div className="flex flex-wrap items-end gap-2">
+            <div>
+              <Label htmlFor={`data-cancelar-${turma.id}`}>Data</Label>
+              <Input
+                id={`data-cancelar-${turma.id}`}
+                type="date"
+                value={data}
+                onChange={(e) => setData(e.target.value)}
+                className="w-40"
+              />
+            </div>
+            <div className="flex-1">
+              <Label htmlFor={`motivo-cancelar-${turma.id}`}>Motivo</Label>
+              <Input
+                id={`motivo-cancelar-${turma.id}`}
+                placeholder="Ex: feriado"
+                value={motivo}
+                onChange={(e) => setMotivo(e.target.value)}
+              />
+            </div>
+            <Button
+              variant="secondary"
+              disabled={!data || !motivo.trim()}
+              onClick={() => {
+                onCancelarData(data, motivo)
+                setCancelandoData(false)
+                setData('')
+                setMotivo('')
+              }}
+            >
+              Confirmar
+            </Button>
+            <Button variant="ghost" onClick={() => setCancelandoData(false)}>
+              Cancelar
+            </Button>
+          </div>
+        ) : (
+          <Button variant="ghost" onClick={() => setCancelandoData(true)}>
+            Cancelar uma aula
+          </Button>
+        )}
+      </div>
+    </Card>
   )
 }
 
