@@ -58,7 +58,7 @@ export function AlunoDashboard() {
 
   const turmasHoje = useMemo(() => {
     const hoje = new Date().getDay()
-    return (turmasQuery.data ?? []).filter((t) => t.dia_semana === hoje)
+    return (turmasQuery.data ?? []).filter((t) => t.dias_semana.includes(hoje))
   }, [turmasQuery.data])
 
   const checkinsHoje = useMemo(() => {
@@ -188,7 +188,7 @@ function TurmaCheckinCard({
         </Button>
       ) : (
         <span className="whitespace-nowrap font-mono text-xs text-rope-dim">
-          {status.motivo === 'antes-do-fim' && `libera às ${format(status.fim, 'HH:mm')}`}
+          {status.motivo === 'ainda-nao-abriu' && `libera às ${format(status.abre, 'HH:mm')}`}
           {status.motivo === 'janela-fechada' && 'janela encerrada'}
           {status.motivo === 'nao-e-hoje' && '—'}
         </span>

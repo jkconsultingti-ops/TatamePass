@@ -2,23 +2,30 @@ import { format } from 'date-fns'
 import type { Turma } from '../types/database'
 
 export type StatusCheckin =
-  | { disponivel: true; fim: Date; limite: Date }
+  | { disponivel: true; abre: Date; fecha: Date }
   | { disponivel: false; motivo: 'nao-e-hoje' }
-  | { disponivel: false; motivo: 'antes-do-fim'; fim: Date }
-  | { disponivel: false; motivo: 'janela-fechada'; fim: Date; limite: Date }
+  | { disponivel: false; motivo: 'ainda-nao-abriu'; abre: Date }
+  | { disponivel: false; motivo: 'janela-fechada'; abre: Date; fecha: Date }
+
+function horarioParaData(horario: string, referencia: Date) {
+  const [hora, minuto] = horario.split(':').map(Number)
+  const data = new Date(referencia)
+  data.setHours(hora, minuto, 0, 0)
+  return data
+}
 
 export function statusCheckin(turma: Turma, agora = new Date()): StatusCheckin {
-  if (turma.dia_semana !== agora.getDay()) return { disponivel: false, motivo: 'nao-e-hoje' }
+  if (!turma.dias_semana.includes(agora.getDay())) return { disponivel: false, motivo: 'nao-e-hoje' }
 
-  const [horaFim, minutoFim] = turma.horario_fim.split(':').map(Number)
-  const fim = new Date(agora)
-  fim.setHours(horaFim, minutoFim, 0, 0)
+  const inicio = horarioParaData(turma.horario_inicio, agora)
+  const fim = horarioParaData(turma.horario_fim, agora)
 
-  const limite = new Date(fim.getTime() + turma.janela_checkin_minutos * 60_000)
+  const abre = new Date(inicio.getTime() - turma.janela_checkin_antes_horas * 3_600_000)
+  const fecha = new Date(fim.getTime() + turma.janela_checkin_depois_horas * 3_600_000)
 
-  if (agora < fim) return { disponivel: false, motivo: 'antes-do-fim', fim }
-  if (agora > limite) return { disponivel: false, motivo: 'janela-fechada', fim, limite }
-  return { disponivel: true, fim, limite }
+  if (agora < abre) return { disponivel: false, motivo: 'ainda-nao-abriu', abre }
+  if (agora > fecha) return { disponivel: false, motivo: 'janela-fechada', abre, fecha }
+  return { disponivel: true, abre, fecha }
 }
 
 export function hojeISO(agora = new Date()) {

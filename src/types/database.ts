@@ -31,10 +31,11 @@ export type Turma = {
   academia_id: string
   nome: string
   professor_id: string
-  dia_semana: number
+  dias_semana: number[]
   horario_inicio: string
   horario_fim: string
-  janela_checkin_minutos: number
+  janela_checkin_antes_horas: number
+  janela_checkin_depois_horas: number
   criado_em: string
 }
 

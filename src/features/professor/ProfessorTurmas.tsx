@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { supabase } from '../../lib/supabase'
@@ -13,10 +13,11 @@ import type { Turma } from '../../types/database'
 
 const turmaSchema = z.object({
   nome: z.string().min(2, 'Informe o nome da turma'),
-  dia_semana: z.coerce.number().min(0).max(6),
+  dias_semana: z.array(z.number().min(0).max(6)).min(1, 'Selecione pelo menos um dia'),
   horario_inicio: z.string().min(1, 'Informe o horário de início'),
   horario_fim: z.string().min(1, 'Informe o horário de término'),
-  janela_checkin_minutos: z.coerce.number().min(1, 'A janela precisa ser maior que zero'),
+  janela_checkin_antes_horas: z.coerce.number().min(0, 'Não pode ser negativo'),
+  janela_checkin_depois_horas: z.coerce.number().min(0.01, 'A janela precisa ser maior que zero'),
 })
 type TurmaFormInput = z.input<typeof turmaSchema>
 type TurmaFormOutput = z.output<typeof turmaSchema>
@@ -31,11 +32,7 @@ export function ProfessorTurmas() {
   const turmasQuery = useQuery({
     queryKey: ['turmas', profile?.academia_id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('turmas')
-        .select('*')
-        .order('dia_semana')
-        .order('horario_inicio')
+      const { data, error } = await supabase.from('turmas').select('*').order('horario_inicio')
       if (error) throw error
       return data as Turma[]
     },
@@ -82,8 +79,9 @@ export function ProfessorTurmas() {
             <div>
               <p className="font-medium text-chalk">{turma.nome}</p>
               <p className="font-mono text-xs text-rope">
-                {DIAS_SEMANA[turma.dia_semana]} · {turma.horario_inicio.slice(0, 5)}–
-                {turma.horario_fim.slice(0, 5)} · janela {turma.janela_checkin_minutos}min
+                {turma.dias_semana.map((d) => DIAS_SEMANA[d].slice(0, 3)).join(', ')} ·{' '}
+                {turma.horario_inicio.slice(0, 5)}–{turma.horario_fim.slice(0, 5)} · check-in{' '}
+                {turma.janela_checkin_antes_horas}h antes – {turma.janela_checkin_depois_horas}h depois
               </p>
             </div>
             <div className="flex gap-2">
@@ -117,6 +115,7 @@ function TurmaFormulario({
   const [erro, setErro] = useState<string | null>(null)
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<TurmaFormInput, unknown, TurmaFormOutput>({
@@ -124,17 +123,19 @@ function TurmaFormulario({
     defaultValues: turma
       ? {
           nome: turma.nome,
-          dia_semana: turma.dia_semana,
+          dias_semana: turma.dias_semana,
           horario_inicio: turma.horario_inicio.slice(0, 5),
           horario_fim: turma.horario_fim.slice(0, 5),
-          janela_checkin_minutos: turma.janela_checkin_minutos,
+          janela_checkin_antes_horas: turma.janela_checkin_antes_horas,
+          janela_checkin_depois_horas: turma.janela_checkin_depois_horas,
         }
       : {
           nome: '',
-          dia_semana: 1,
+          dias_semana: [1],
           horario_inicio: '19:00',
           horario_fim: '20:00',
-          janela_checkin_minutos: 60,
+          janela_checkin_antes_horas: 1,
+          janela_checkin_depois_horas: 1,
         },
   })
 
@@ -169,18 +170,39 @@ function TurmaFormulario({
           <FieldError>{errors.nome?.message}</FieldError>
         </div>
         <div>
-          <Label htmlFor="dia-semana">Dia da semana</Label>
-          <select
-            id="dia-semana"
-            {...register('dia_semana')}
-            className="w-full rounded-sm border border-rope-dim/50 bg-ink px-3.5 py-2.5 text-sm text-chalk focus:border-hanko focus:outline-none focus:ring-1 focus:ring-hanko"
-          >
-            {DIAS_SEMANA.map((nome, indice) => (
-              <option key={nome} value={indice}>
-                {nome}
-              </option>
-            ))}
-          </select>
+          <Label>Dias de atendimento</Label>
+          <Controller
+            control={control}
+            name="dias_semana"
+            render={({ field }) => (
+              <div className="flex flex-wrap gap-2">
+                {DIAS_SEMANA.map((nome, indice) => {
+                  const selecionado = field.value.includes(indice)
+                  return (
+                    <button
+                      key={nome}
+                      type="button"
+                      onClick={() =>
+                        field.onChange(
+                          selecionado
+                            ? field.value.filter((d) => d !== indice)
+                            : [...field.value, indice].sort((a, b) => a - b),
+                        )
+                      }
+                      className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${
+                        selecionado
+                          ? 'bg-hanko text-paper'
+                          : 'bg-ink-soft text-rope-dim hover:text-rope'
+                      }`}
+                    >
+                      {nome.slice(0, 3)}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          />
+          <FieldError>{errors.dias_semana?.message}</FieldError>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -194,10 +216,29 @@ function TurmaFormulario({
             <FieldError>{errors.horario_fim?.message}</FieldError>
           </div>
         </div>
-        <div>
-          <Label htmlFor="janela">Janela de check-in após o fim (minutos)</Label>
-          <Input id="janela" type="number" min={1} {...register('janela_checkin_minutos')} />
-          <FieldError>{errors.janela_checkin_minutos?.message}</FieldError>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="janela-antes">Check-in antes do início (horas)</Label>
+            <Input
+              id="janela-antes"
+              type="number"
+              step="0.5"
+              min={0}
+              {...register('janela_checkin_antes_horas')}
+            />
+            <FieldError>{errors.janela_checkin_antes_horas?.message}</FieldError>
+          </div>
+          <div>
+            <Label htmlFor="janela-depois">Check-in depois do término (horas)</Label>
+            <Input
+              id="janela-depois"
+              type="number"
+              step="0.5"
+              min={0.5}
+              {...register('janela_checkin_depois_horas')}
+            />
+            <FieldError>{errors.janela_checkin_depois_horas?.message}</FieldError>
+          </div>
         </div>
         <FieldError>{erro ?? undefined}</FieldError>
         <div className="flex gap-3">

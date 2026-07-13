@@ -58,7 +58,7 @@ export function ProfessorDashboard() {
 
   const turmasHoje = useMemo(() => {
     const hoje = new Date().getDay()
-    return (turmasQuery.data ?? []).filter((t) => t.dia_semana === hoje)
+    return (turmasQuery.data ?? []).filter((t) => t.dias_semana.includes(hoje))
   }, [turmasQuery.data])
 
   return (

@@ -21,7 +21,7 @@ export function AlunoTurmas() {
 
   const porDia = DIAS_SEMANA.map((nome, indice) => ({
     nome,
-    turmas: (turmasQuery.data ?? []).filter((t) => t.dia_semana === indice),
+    turmas: (turmasQuery.data ?? []).filter((t) => t.dias_semana.includes(indice)),
   })).filter((dia) => dia.turmas.length > 0)
 
   return (
