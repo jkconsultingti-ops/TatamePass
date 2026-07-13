@@ -9,6 +9,7 @@ import { AlunoTurmas } from './features/aluno/AlunoTurmas'
 import { ProfessorLayout } from './features/professor/ProfessorLayout'
 import { ProfessorDashboard } from './features/professor/ProfessorDashboard'
 import { ProfessorTurmas } from './features/professor/ProfessorTurmas'
+import { ProfessorAgenda } from './features/professor/ProfessorAgenda'
 import { ProfessorAlunos } from './features/professor/ProfessorAlunos'
 import { ProfessorAlunoDetalhe } from './features/professor/ProfessorAlunoDetalhe'
 import { ProfessorPerfilForm } from './features/professor/ProfessorPerfilForm'
@@ -42,6 +43,7 @@ export const router = createBrowserRouter([
         element: <ProfessorLayout />,
         children: [
           { path: '/professor', element: <ProfessorDashboard /> },
+          { path: '/professor/agenda', element: <ProfessorAgenda /> },
           { path: '/professor/turmas', element: <ProfessorTurmas /> },
           { path: '/professor/alunos', element: <ProfessorAlunos /> },
           { path: '/professor/alunos/:id', element: <ProfessorAlunoDetalhe /> },
