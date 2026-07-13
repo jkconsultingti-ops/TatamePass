@@ -5,7 +5,7 @@ import { useAuth } from '../../auth/AuthProvider'
 import { useFormularios, formularioPadrao } from '../../lib/formularios'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
-import { Label, Textarea } from '../../components/Field'
+import { Label, Input, Textarea } from '../../components/Field'
 import type { PerfilCampo, PerfilResposta, Turma } from '../../types/database'
 
 export function AlunoPerfil() {
@@ -17,6 +17,10 @@ export function AlunoPerfil() {
   const [uploadCampo, setUploadCampo] = useState<string | null>(null)
   const [fotoEnviando, setFotoEnviando] = useState(false)
   const [turmaSalvando, setTurmaSalvando] = useState(false)
+  const [nome, setNome] = useState(profile?.nome ?? '')
+  const [nomeSalvando, setNomeSalvando] = useState(false)
+
+  useEffect(() => setNome(profile?.nome ?? ''), [profile?.nome])
 
   const formulariosQuery = useFormularios(profile?.academia_id)
   const formulario = formularioPadrao(formulariosQuery.data)
@@ -66,6 +70,20 @@ export function AlunoPerfil() {
     }
     setValores(mapa)
   }, [respostasQuery.data])
+
+  async function salvarNome() {
+    if (!profile || !nome.trim() || nome.trim() === profile.nome) return
+    setNomeSalvando(true)
+    try {
+      const { error } = await supabase.from('profiles').update({ nome: nome.trim() }).eq('id', profile.id)
+      if (error) throw error
+      await refreshProfile()
+    } catch (err) {
+      setMensagem(err instanceof Error ? err.message : 'Não foi possível salvar o nome')
+    } finally {
+      setNomeSalvando(false)
+    }
+  }
 
   async function salvarTurmaPrincipal(turmaId: string) {
     if (!profile) return
@@ -179,6 +197,17 @@ export function AlunoPerfil() {
             className="text-xs text-rope"
           />
         </div>
+      </Card>
+
+      <Card>
+        <Label htmlFor="nome-completo">Nome completo</Label>
+        <Input
+          id="nome-completo"
+          value={nome}
+          disabled={nomeSalvando}
+          onChange={(e) => setNome(e.target.value)}
+          onBlur={salvarNome}
+        />
       </Card>
 
       <Card>
