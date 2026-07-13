@@ -17,9 +17,6 @@ import { ptBR } from 'date-fns/locale'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../auth/AuthProvider'
 import { useAulasCanceladas } from '../../lib/aulas'
-import { Card } from '../../components/Card'
-import { Button } from '../../components/Button'
-import { Badge } from '../../components/Badge'
 import { DIAS_SEMANA } from '../../types/database'
 import type { Turma, AulaCancelada } from '../../types/database'
 
@@ -94,30 +91,30 @@ export function ProfessorAgenda() {
       {erro && <p className="font-mono text-xs text-hanko">{erro}</p>}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
-        <Card>
+        <div className="rounded-md border border-neutral-200 bg-white p-5">
           <div className="flex items-center justify-between">
             <button
               type="button"
               onClick={() => setMesAtual((m) => subMonths(m, 1))}
-              className="px-2 py-1 text-rope hover:text-chalk"
+              className="px-2 py-1 text-neutral-400 hover:text-neutral-700"
               aria-label="Mês anterior"
             >
               ‹
             </button>
-            <p className="font-display text-lg capitalize text-chalk">
+            <p className="font-display text-lg capitalize text-neutral-900">
               {format(mesAtual, 'MMMM yyyy', { locale: ptBR })}
             </p>
             <button
               type="button"
               onClick={() => setMesAtual((m) => addMonths(m, 1))}
-              className="px-2 py-1 text-rope hover:text-chalk"
+              className="px-2 py-1 text-neutral-400 hover:text-neutral-700"
               aria-label="Próximo mês"
             >
               ›
             </button>
           </div>
 
-          <div className="mt-4 grid grid-cols-7 gap-1 text-center font-mono text-[11px] uppercase tracking-wide text-rope">
+          <div className="mt-4 grid grid-cols-7 gap-1 text-center font-mono text-[11px] uppercase tracking-wide text-neutral-400">
             {DIAS_SEMANA.map((nome) => (
               <span key={nome}>{nome.slice(0, 3)}</span>
             ))}
@@ -125,8 +122,8 @@ export function ProfessorAgenda() {
 
           <div className="mt-1 grid grid-cols-7 gap-1">
             {dias.map((dia) => {
-              const temTurma = turmasNoDia(dia).length > 0
               const selecionado = isSameDay(dia, diaSelecionado)
+              const hoje = isToday(dia)
               const foraDoMes = !isSameMonth(dia, mesAtual)
               return (
                 <button
@@ -134,28 +131,30 @@ export function ProfessorAgenda() {
                   type="button"
                   onClick={() => setDiaSelecionado(dia)}
                   className={`aspect-square rounded-md text-sm transition-colors ${
-                    foraDoMes
-                      ? 'text-rope-dim/40'
-                      : temTurma
-                        ? 'border border-hanko/30 bg-hanko/10 text-chalk'
-                        : 'text-rope-dim'
-                  } ${selecionado ? 'ring-2 ring-hanko' : ''} ${isToday(dia) ? 'font-semibold' : ''}`}
+                    selecionado
+                      ? 'bg-hanko font-semibold text-white'
+                      : hoje
+                        ? 'text-hanko ring-2 ring-hanko font-semibold'
+                        : foraDoMes
+                          ? 'text-neutral-300 hover:bg-neutral-50'
+                          : 'text-neutral-700 hover:bg-neutral-100'
+                  }`}
                 >
                   {format(dia, 'd')}
                 </button>
               )
             })}
           </div>
-        </Card>
+        </div>
 
-        <Card>
-          <p className="font-mono text-xs uppercase tracking-wide text-rope">
+        <div className="rounded-md border border-neutral-200 bg-white p-5">
+          <p className="font-mono text-xs uppercase tracking-wide text-neutral-400">
             {format(diaSelecionado, "d 'de' MMMM", { locale: ptBR })}
           </p>
 
           <div className="mt-4 flex flex-col gap-3">
             {turmasDoDiaSelecionado.length === 0 && (
-              <p className="text-sm text-rope">Nenhuma aula neste dia.</p>
+              <p className="text-sm text-neutral-500">Nenhuma aula neste dia.</p>
             )}
             {turmasDoDiaSelecionado.map((turma) => {
               const cancelada = canceladasQuery.data?.find(
@@ -172,7 +171,7 @@ export function ProfessorAgenda() {
               )
             })}
           </div>
-        </Card>
+        </div>
       </div>
     </div>
   )
@@ -192,23 +191,29 @@ function TurmaDoDia({
   const [cancelando, setCancelando] = useState(false)
 
   return (
-    <div className="rounded-md border border-rope-dim/20 p-3">
-      <p className="text-sm text-chalk">{turma.nome}</p>
-      <p className="font-mono text-xs text-rope">
+    <div className="rounded-md border border-neutral-200 p-3">
+      <p className="text-sm text-neutral-900">{turma.nome}</p>
+      <p className="font-mono text-xs text-neutral-500">
         {turma.horario_inicio.slice(0, 5)}–{turma.horario_fim.slice(0, 5)}
       </p>
       {cancelada ? (
         <div className="mt-2 flex items-center justify-between gap-2">
-          <Badge tone="hanko">Cancelada — {cancelada.motivo}</Badge>
-          <Button variant="ghost" onClick={onDesfazer}>
+          <span className="inline-flex items-center rounded-full border border-hanko/40 bg-hanko/10 px-2.5 py-0.5 font-mono text-[11px] uppercase tracking-wide text-hanko">
+            Cancelada — {cancelada.motivo}
+          </span>
+          <button
+            type="button"
+            onClick={onDesfazer}
+            className="font-mono text-xs text-neutral-500 hover:text-hanko"
+          >
             Desfazer
-          </Button>
+          </button>
         </div>
       ) : cancelando ? (
         <input
           autoFocus
           placeholder="Motivo (ex: feriado)"
-          className="mt-2 w-full rounded-sm border border-rope-dim/50 bg-ink px-2.5 py-1.5 text-sm text-chalk focus:border-hanko focus:outline-none"
+          className="mt-2 w-full rounded-sm border border-neutral-300 bg-white px-2.5 py-1.5 text-sm text-neutral-900 focus:border-hanko focus:outline-none"
           onBlur={(e) => {
             if (e.target.value.trim()) onCancelar(e.target.value)
             setCancelando(false)
@@ -219,9 +224,13 @@ function TurmaDoDia({
           }}
         />
       ) : (
-        <Button variant="ghost" onClick={() => setCancelando(true)} className="mt-2">
+        <button
+          type="button"
+          onClick={() => setCancelando(true)}
+          className="mt-2 font-mono text-xs text-neutral-500 hover:text-hanko"
+        >
           Cancelar esta aula
-        </Button>
+        </button>
       )}
     </div>
   )
