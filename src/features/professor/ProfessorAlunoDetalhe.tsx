@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../auth/AuthProvider'
+import { useFormularios, formularioPadrao } from '../../lib/formularios'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
 import { Badge } from '../../components/Badge'
@@ -49,14 +50,21 @@ export function ProfessorAlunoDetalhe() {
     enabled: !!id,
   })
 
+  const formulariosQuery = useFormularios(profile?.academia_id)
+  const formulario = formularioPadrao(formulariosQuery.data)
+
   const camposQuery = useQuery({
-    queryKey: ['perfil_campos', profile?.academia_id],
+    queryKey: ['perfil_campos', formulario?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('perfil_campos').select('*').order('ordem')
+      const { data, error } = await supabase
+        .from('perfil_campos')
+        .select('*')
+        .eq('formulario_id', formulario!.id)
+        .order('ordem')
       if (error) throw error
       return data as PerfilCampo[]
     },
-    enabled: !!profile,
+    enabled: !!formulario,
   })
 
   const respostasQuery = useQuery({

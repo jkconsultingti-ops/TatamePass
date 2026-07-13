@@ -40,9 +40,18 @@ export type Checkin = {
   criado_em: string
 }
 
+export type Formulario = {
+  id: string
+  academia_id: string
+  nome: string
+  padrao: boolean
+  criado_em: string
+}
+
 export type PerfilCampo = {
   id: string
   academia_id: string
+  formulario_id: string
   label: string
   tipo: CampoTipo
   obrigatorio: boolean
@@ -79,6 +88,7 @@ export type Database = {
       profiles: TableOf<Profile>
       turmas: TableOf<Turma>
       checkins: TableOf<Checkin>
+      formularios: TableOf<Formulario>
       perfil_campos: TableOf<PerfilCampo>
       perfil_respostas: TableOf<PerfilResposta>
       graduacoes: TableOf<Graduacao>

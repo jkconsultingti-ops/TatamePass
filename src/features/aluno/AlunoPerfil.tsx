@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../auth/AuthProvider'
+import { useFormularios, formularioPadrao } from '../../lib/formularios'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
 import { Label, Textarea } from '../../components/Field'
@@ -17,14 +18,21 @@ export function AlunoPerfil() {
   const [fotoEnviando, setFotoEnviando] = useState(false)
   const [turmaSalvando, setTurmaSalvando] = useState(false)
 
+  const formulariosQuery = useFormularios(profile?.academia_id)
+  const formulario = formularioPadrao(formulariosQuery.data)
+
   const camposQuery = useQuery({
-    queryKey: ['perfil_campos', profile?.academia_id],
+    queryKey: ['perfil_campos', formulario?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('perfil_campos').select('*').order('ordem')
+      const { data, error } = await supabase
+        .from('perfil_campos')
+        .select('*')
+        .eq('formulario_id', formulario!.id)
+        .order('ordem')
       if (error) throw error
       return data as PerfilCampo[]
     },
-    enabled: !!profile,
+    enabled: !!formulario,
   })
 
   const respostasQuery = useQuery({
