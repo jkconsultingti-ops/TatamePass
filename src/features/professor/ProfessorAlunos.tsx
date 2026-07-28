@@ -44,6 +44,8 @@ export function ProfessorAlunos() {
     return mapa
   }, [checkinsQuery.data])
 
+  const base = profile?.role === 'admin' ? '/admin' : '/professor'
+
   return (
     <div className="flex flex-col gap-6">
       <h1 className="font-display text-2xl font-semibold text-chalk">Alunos</h1>
@@ -53,7 +55,7 @@ export function ProfessorAlunos() {
           return (
             <Link
               key={aluno.id}
-              to={`/professor/alunos/${aluno.id}`}
+              to={`${base}/alunos/${aluno.id}`}
               className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-ink"
             >
               <div className="flex items-center gap-3">

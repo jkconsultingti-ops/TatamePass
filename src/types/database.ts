@@ -1,4 +1,4 @@
-export type UserRole = 'aluno' | 'professor'
+export type UserRole = 'aluno' | 'professor' | 'admin'
 export type CampoTipo =
   | 'texto_curto'
   | 'texto_longo'
@@ -13,6 +13,7 @@ export type Academia = {
   id: string
   nome: string
   codigo_convite: string
+  codigo_convite_professor: string
   criado_em: string
 }
 
@@ -159,12 +160,12 @@ export type Database = {
     Views: Record<string, never>
     Functions: {
       create_academia: {
-        Args: { p_nome: string; p_codigo: string }
+        Args: { p_nome: string; p_codigo: string; p_codigo_professor: string }
         Returns: Academia
       }
       resolve_convite: {
         Args: { p_codigo: string }
-        Returns: { academia_id: string; nome: string }[]
+        Returns: { academia_id: string; nome: string; role: UserRole }[]
       }
     }
     Enums: Record<string, never>

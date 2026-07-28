@@ -193,7 +193,10 @@ export function ProfessorAlunoDetalhe() {
       <section>
         <div className="flex items-center justify-between">
           <h2 className="font-mono text-xs uppercase tracking-[0.14em] text-rope">Histórico de graduação</h2>
-          <Link to="/professor/graduacao" className="font-mono text-xs text-rope hover:text-hanko">
+          <Link
+            to={profile?.role === 'admin' ? '/admin/graduacao' : '/professor/graduacao'}
+            className="font-mono text-xs text-rope hover:text-hanko"
+          >
             conceder grau →
           </Link>
         </div>

@@ -24,7 +24,7 @@ const turmaSchema = z.object({
 type TurmaFormInput = z.input<typeof turmaSchema>
 type TurmaFormOutput = z.output<typeof turmaSchema>
 
-export function ProfessorTurmas() {
+export function AdminTurmas() {
   const { profile } = useAuth()
   const queryClient = useQueryClient()
   const [editando, setEditando] = useState<Turma | null>(null)

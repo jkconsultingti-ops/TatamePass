@@ -4,16 +4,21 @@ import { FullscreenLoader } from '../components/FullscreenLoader'
 import type { UserRole } from '../types/database'
 
 function homePathFor(role: UserRole) {
-  return role === 'professor' ? '/professor' : '/aluno'
+  if (role === 'admin') return '/admin'
+  if (role === 'professor') return '/professor'
+  return '/aluno'
 }
 
-export function ProtectedRoute({ role }: { role?: UserRole }) {
+export function ProtectedRoute({ role }: { role?: UserRole | UserRole[] }) {
   const { session, profile, loading } = useAuth()
 
   if (loading) return <FullscreenLoader />
   if (!session) return <Navigate to="/login" replace />
   if (!profile) return <Navigate to="/onboarding" replace />
-  if (role && profile.role !== role) return <Navigate to={homePathFor(profile.role)} replace />
+  if (role) {
+    const permitido = Array.isArray(role) ? role.includes(profile.role) : profile.role === role
+    if (!permitido) return <Navigate to={homePathFor(profile.role)} replace />
+  }
 
   return <Outlet />
 }

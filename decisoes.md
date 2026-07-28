@@ -38,6 +38,18 @@ O briefing original definia login com Google como requisito único. A pedido do 
 
 Abrir uma rota direta (`/login`, `/aluno`, `/professor` etc) na Vercel sem esse arquivo devolve 404, porque não existe um arquivo físico com esse nome — o roteamento é todo client-side via React Router, só existe depois que o `index.html` carrega o JS. `vercel.json` com um rewrite de qualquer caminho para `/index.html` resolve; sem isso, o app só funciona abrindo exatamente a raiz do domínio.
 
+## Papel de admin separado de professor (substitui "professor acumula admin")
+
+O briefing original definia só dois papéis, com o professor acumulando admin. A pedido do usuário, viraram três: `admin` (configura turmas, formulário de perfil, faixas de graduação, cadastra/promove professores), `professor` (opera o dia a dia — agenda, alunos, conceder graduação, aprovar exame médico — mas só *visualiza* turmas) e `aluno`. Todo `professor` que já existia na base foi promovido a `admin` na migração (ele já era o dono de fato da academia sob o modelo antigo). Pode haver mais de um admin por academia; um admin promove/rebaixa outros via `/admin/professores`. Telas que fazem sentido pros dois papéis (agenda, lista/detalhe de alunos, conceder graduação) não foram duplicadas — o mesmo componente é montado em duas rotas (`/professor/...` e `/admin/...`), cada uma atrás do `ProtectedRoute` do papel correspondente.
+
+## Convite por link em vez de código digitado
+
+Antes o aluno digitava um `codigo_convite` manualmente no onboarding. Virou um link (`/convite/:codigo`) que a academia manda pronto — um pra aluno, um pra professor (`academias.codigo_convite_professor`, novo). A RPC `resolve_convite` passa a devolver também o papel resolvido (bate com `codigo_convite` → aluno, com `codigo_convite_professor` → professor) e ficou liberada pra `anon` além de `authenticated`, pra a página do convite conseguir mostrar "convite pra {academia} como {papel}" antes da pessoa logar — só expõe nome da academia e papel, nada sensível. A tela de login principal (`/login`) só oferece "criar uma academia" como caminho de entrada nova; virar aluno ou professor só acontece por quem recebeu o link específico.
+
+## `profiles.role` e `perfil_campos.tipo` como text+check, não enum
+
+Os dois começaram como enum do Postgres, mas viraram `text` com `check` constraint (primeiro `perfil_campos.tipo`, depois `profiles.role`) pelo mesmo motivo: o Postgres não deixa usar um valor de enum recém-adicionado (`ALTER TYPE ... ADD VALUE`) na mesma transação em que ele foi criado — trava real quando a migração também precisa *usar* o valor novo (ex: promover todo `professor` existente pra `admin` na mesma migração que introduziu `admin`). `text + check` não tem essa restrição e é igual de fácil de validar.
+
 ## Tailwind v4 com tokens de design customizados
 
 Cores, fontes e nomes semânticos (`hanko`, `mat`, `paper`, `ink`, `rope`, `chalk`) são definidos como CSS custom properties dentro de um bloco `@theme` em `src/index.css`, que o Tailwind v4 transforma automaticamente em utilitários (`bg-hanko`, `text-mat-light` etc). Evita duplicar a paleta em um arquivo de config separado (Tailwind v4 é CSS-first) e mantém os tokens visíveis num único lugar.

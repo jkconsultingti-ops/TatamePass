@@ -1,12 +1,13 @@
 -- TatamePass — script único de bootstrap para um projeto Supabase novo.
 --
--- Equivale a rodar 0001_init.sql até 0009_identificador_login.sql em
+-- Equivale a rodar 0001_init.sql até 0010_papel_admin_e_convites.sql em
 -- sequência, mas já no estado final (sem os passos intermediários que essas
 -- migrations desfazem umas nas outras — ex: dia_semana → dias_semana,
--- campo_tipo enum → text+check, faixa texto livre → faixa_id). Use este
--- arquivo para um projeto Supabase vazio. Os arquivos numerados em
--- supabase/migrations/ continuam no repo como histórico de como o schema
--- evoluiu — não precisam ser rodados se você já rodou este aqui.
+-- campo_tipo/user_role enum → text+check, faixa texto livre → faixa_id,
+-- professor acumula admin → admin separado). Use este arquivo para um
+-- projeto Supabase vazio. Os arquivos numerados em supabase/migrations/
+-- continuam no repo como histórico de como o schema evoluiu — não precisam
+-- ser rodados se você já rodou este aqui.
 --
 -- Rodar tudo de uma vez no SQL Editor do Supabase, em um projeto novo, sem
 -- nada criado ainda.
@@ -14,8 +15,11 @@
 create extension if not exists "pgcrypto";
 
 -- ── Tipos ─────────────────────────────────────────────────────────────
+-- `profiles.role` e `perfil_campos.tipo` são text+check, não enum — evita a
+-- trava do Postgres de não poder usar um valor de enum recém-criado na
+-- mesma transação em que foi adicionado (relevante porque essas listas
+-- continuam evoluindo).
 
-create type user_role as enum ('aluno', 'professor');
 create type tipo_turma as enum ('adulto', 'infantil');
 create type exame_medico_status as enum ('pendente', 'aprovado');
 create type identificador_tipo as enum ('email', 'telefone');
@@ -26,13 +30,14 @@ create table academias (
   id uuid primary key default gen_random_uuid(),
   nome text not null,
   codigo_convite text not null unique,
+  codigo_convite_professor text not null unique,
   criado_em timestamptz not null default now()
 );
 
 create table profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   academia_id uuid not null references academias (id) on delete cascade,
-  role user_role not null,
+  role text not null check (role in ('aluno', 'professor', 'admin')),
   nome text not null,
   foto_url text,
   turma_principal_id uuid,
@@ -186,7 +191,7 @@ language sql stable security definer set search_path = public as $$
 $$;
 
 create or replace function auth_role()
-returns user_role
+returns text
 language sql stable security definer set search_path = public as $$
   select role from profiles where id = auth.uid();
 $$;
@@ -194,14 +199,15 @@ $$;
 grant execute on function auth_academia_id() to authenticated;
 grant execute on function auth_role() to authenticated;
 
--- Trava role/academia_id contra alteração depois do onboarding, pra evitar
--- que um aluno se promova a professor ou pule de academia editando o próprio perfil.
+-- Trava role/academia_id contra alteração fora do onboarding, exceto quando
+-- quem está fazendo a operação é admin (é o que permite promover/rebaixar
+-- alguém) — impede que um aluno/professor se autopromova.
 
 create or replace function prevent_profile_privilege_escalation()
 returns trigger
 language plpgsql as $$
 begin
-  if new.role <> old.role or new.academia_id <> old.academia_id then
+  if (new.role <> old.role or new.academia_id <> old.academia_id) and auth_role() <> 'admin' then
     raise exception 'não é permitido alterar role ou academia_id do perfil';
   end if;
   return new;
@@ -229,14 +235,14 @@ create trigger exames_medicos_set_atualizado_em
   before update on exames_medicos
   for each row execute function set_atualizado_em();
 
--- Só o professor pode marcar o exame médico como aprovado ou definir a
--- validade — o aluno só consegue deixar a própria submissão como
+-- Só professor ou admin podem marcar o exame médico como aprovado ou
+-- definir a validade — o aluno só consegue deixar a própria submissão como
 -- "pendente", sem validade.
 create or replace function prevent_exame_autoaprovacao()
 returns trigger
 language plpgsql as $$
 begin
-  if auth_role() = 'professor' then
+  if auth_role() in ('professor', 'admin') then
     return new;
   end if;
 
@@ -279,19 +285,20 @@ create trigger auth_users_confirmar_telefone
   before insert on auth.users
   for each row execute function auth_confirmar_telefone_tecnico();
 
--- Onboarding: criação de academia (professor) e resolução de código de
--- convite (aluno) precisam rodar fora da RLS normal, já que o usuário
--- ainda não tem uma linha em `profiles` nesse momento. Já semeia o
+-- Onboarding: criação de academia (vira admin) e resolução de convite (por
+-- link, aluno ou professor) precisam rodar fora da RLS normal, já que o
+-- usuário ainda não tem uma linha em `profiles` nesse momento. Já semeia o
 -- formulário de perfil padrão e a sequência de faixas da academia nova.
 
-create or replace function create_academia(p_nome text, p_codigo text)
+create or replace function create_academia(p_nome text, p_codigo text, p_codigo_professor text)
 returns academias
 language plpgsql security definer set search_path = public as $$
 declare
   v_academia academias;
   v_formulario formularios;
 begin
-  insert into academias (nome, codigo_convite) values (p_nome, p_codigo)
+  insert into academias (nome, codigo_convite, codigo_convite_professor)
+  values (p_nome, p_codigo, p_codigo_professor)
   returning * into v_academia;
 
   insert into formularios (academia_id, nome, padrao)
@@ -333,14 +340,21 @@ begin
 end;
 $$;
 
+grant execute on function create_academia(text, text, text) to authenticated;
+
+-- resolve_convite verifica os dois tokens (aluno e professor) e devolve o
+-- papel resolvido — a página de convite mostra "convite pra {academia} como
+-- {papel}" antes da pessoa logar, então libera pra anon também (só revela
+-- nome da academia + papel, nada sensível).
 create or replace function resolve_convite(p_codigo text)
-returns table (academia_id uuid, nome text)
+returns table (academia_id uuid, nome text, role text)
 language sql stable security definer set search_path = public as $$
-  select id, nome from academias where codigo_convite = p_codigo;
+  select id, nome, 'aluno' from academias where codigo_convite = p_codigo
+  union all
+  select id, nome, 'professor' from academias where codigo_convite_professor = p_codigo;
 $$;
 
-grant execute on function create_academia(text, text) to authenticated;
-grant execute on function resolve_convite(text) to authenticated;
+grant execute on function resolve_convite(text) to anon, authenticated;
 
 -- ── Row Level Security ───────────────────────────────────────────────────
 
@@ -360,8 +374,9 @@ alter table aulas_canceladas enable row level security;
 create policy "academias_select_propria" on academias
   for select using (id = auth_academia_id());
 
--- profiles: leitura de todos os perfis da mesma academia (professor precisa
--- ver a lista de alunos; aluno também enxerga colegas/professor da turma).
+-- profiles: leitura de todos os perfis da mesma academia. Cada um atualiza
+-- o próprio (nome/foto/turma principal); admin pode atualizar qualquer
+-- perfil da academia (inclusive role, pra promover/rebaixar).
 create policy "profiles_select_mesma_academia" on profiles
   for select using (academia_id = auth_academia_id());
 
@@ -371,20 +386,25 @@ create policy "profiles_insert_proprio" on profiles
 create policy "profiles_update_proprio" on profiles
   for update using (id = auth.uid());
 
--- turmas: leitura por qualquer membro da academia; escrita só por professor.
+create policy "profiles_update_admin" on profiles
+  for update using (academia_id = auth_academia_id() and auth_role() = 'admin')
+  with check (academia_id = auth_academia_id() and auth_role() = 'admin');
+
+-- turmas: leitura por qualquer membro da academia; escrita só por admin
+-- (professor só visualiza).
 create policy "turmas_select_mesma_academia" on turmas
   for select using (academia_id = auth_academia_id());
 
-create policy "turmas_write_professor" on turmas
-  for all using (academia_id = auth_academia_id() and auth_role() = 'professor')
-  with check (academia_id = auth_academia_id() and auth_role() = 'professor');
+create policy "turmas_write_admin" on turmas
+  for all using (academia_id = auth_academia_id() and auth_role() = 'admin')
+  with check (academia_id = auth_academia_id() and auth_role() = 'admin');
 
 -- checkins: aluno lê/insere/cancela os próprios (cancela só no mesmo dia);
--- professor lê todos da academia.
+-- professor ou admin leem todos da academia.
 create policy "checkins_select" on checkins
   for select using (
     academia_id = auth_academia_id()
-    and (aluno_id = auth.uid() or auth_role() = 'professor')
+    and (aluno_id = auth.uid() or auth_role() in ('professor', 'admin'))
   );
 
 create policy "checkins_insert_proprio" on checkins
@@ -395,47 +415,47 @@ create policy "checkins_insert_proprio" on checkins
 create policy "checkins_delete_proprio" on checkins
   for delete to authenticated using (aluno_id = auth.uid() and data = current_date);
 
--- formularios: leitura por todos da academia; escrita só por professor.
+-- formularios: leitura por todos da academia; escrita só por admin.
 create policy "formularios_select_mesma_academia" on formularios
   for select using (academia_id = auth_academia_id());
 
-create policy "formularios_write_professor" on formularios
-  for all using (academia_id = auth_academia_id() and auth_role() = 'professor')
-  with check (academia_id = auth_academia_id() and auth_role() = 'professor');
+create policy "formularios_write_admin" on formularios
+  for all using (academia_id = auth_academia_id() and auth_role() = 'admin')
+  with check (academia_id = auth_academia_id() and auth_role() = 'admin');
 
--- perfil_campos: leitura por todos da academia; escrita só por professor.
+-- perfil_campos: leitura por todos da academia; escrita só por admin.
 create policy "perfil_campos_select_mesma_academia" on perfil_campos
   for select using (academia_id = auth_academia_id());
 
-create policy "perfil_campos_write_professor" on perfil_campos
-  for all using (academia_id = auth_academia_id() and auth_role() = 'professor')
-  with check (academia_id = auth_academia_id() and auth_role() = 'professor');
+create policy "perfil_campos_write_admin" on perfil_campos
+  for all using (academia_id = auth_academia_id() and auth_role() = 'admin')
+  with check (academia_id = auth_academia_id() and auth_role() = 'admin');
 
--- perfil_respostas: aluno gerencia as próprias; professor só lê, da própria academia.
+-- perfil_respostas: aluno gerencia as próprias; professor/admin só leem, da própria academia.
 create policy "perfil_respostas_gerencia_proprio" on perfil_respostas
   for all using (aluno_id = auth.uid())
   with check (aluno_id = auth.uid());
 
-create policy "perfil_respostas_select_professor" on perfil_respostas
+create policy "perfil_respostas_select_staff" on perfil_respostas
   for select using (
-    auth_role() = 'professor'
+    auth_role() in ('professor', 'admin')
     and exists (
       select 1 from profiles p
       where p.id = perfil_respostas.aluno_id and p.academia_id = auth_academia_id()
     )
   );
 
--- faixas_config: leitura por todos da academia; só professor ajusta os
--- números (aulas_por_grau/graus_por_faixa) — sem insert/delete via app, a
--- sequência de faixas é semeada por create_academia().
+-- faixas_config: leitura por todos da academia; só admin ajusta os números
+-- (aulas_por_grau/graus_por_faixa) — sem insert/delete via app, a sequência
+-- de faixas é semeada por create_academia().
 create policy "faixas_config_select_mesma_academia" on faixas_config
   for select using (academia_id = auth_academia_id());
 
-create policy "faixas_config_update_professor" on faixas_config
-  for update using (academia_id = auth_academia_id() and auth_role() = 'professor')
-  with check (academia_id = auth_academia_id() and auth_role() = 'professor');
+create policy "faixas_config_update_admin" on faixas_config
+  for update using (academia_id = auth_academia_id() and auth_role() = 'admin')
+  with check (academia_id = auth_academia_id() and auth_role() = 'admin');
 
--- graduacoes: leitura por todos da academia; só professor concede.
+-- graduacoes: leitura por todos da academia; professor ou admin concedem.
 create policy "graduacoes_select_mesma_academia" on graduacoes
   for select using (
     exists (
@@ -444,9 +464,9 @@ create policy "graduacoes_select_mesma_academia" on graduacoes
     )
   );
 
-create policy "graduacoes_insert_professor" on graduacoes
+create policy "graduacoes_insert_staff" on graduacoes
   for insert to authenticated with check (
-    auth_role() = 'professor'
+    auth_role() in ('professor', 'admin')
     and concedido_por = auth.uid()
     and exists (
       select 1 from profiles p
@@ -454,30 +474,33 @@ create policy "graduacoes_insert_professor" on graduacoes
     )
   );
 
--- exames_medicos: aluno vê/envia o próprio; professor vê/gerencia todos da
--- academia (aprovação/validade travadas pelo trigger acima).
+-- exames_medicos: aluno vê/envia o próprio; professor/admin veem/gerenciam
+-- todos da academia (aprovação/validade travadas pelo trigger acima).
 create policy "exames_medicos_select" on exames_medicos
   for select using (
-    academia_id = auth_academia_id() and (aluno_id = auth.uid() or auth_role() = 'professor')
+    academia_id = auth_academia_id()
+    and (aluno_id = auth.uid() or auth_role() in ('professor', 'admin'))
   );
 
 create policy "exames_medicos_insert" on exames_medicos
   for insert to authenticated with check (
-    academia_id = auth_academia_id() and (aluno_id = auth.uid() or auth_role() = 'professor')
+    academia_id = auth_academia_id()
+    and (aluno_id = auth.uid() or auth_role() in ('professor', 'admin'))
   );
 
 create policy "exames_medicos_update" on exames_medicos
   for update using (
-    academia_id = auth_academia_id() and (aluno_id = auth.uid() or auth_role() = 'professor')
+    academia_id = auth_academia_id()
+    and (aluno_id = auth.uid() or auth_role() in ('professor', 'admin'))
   );
 
--- aulas_canceladas: leitura por todos da academia; só professor cancela/desfaz.
+-- aulas_canceladas: leitura por todos da academia; professor ou admin cancelam/desfazem.
 create policy "aulas_canceladas_select_mesma_academia" on aulas_canceladas
   for select using (academia_id = auth_academia_id());
 
-create policy "aulas_canceladas_write_professor" on aulas_canceladas
-  for all using (academia_id = auth_academia_id() and auth_role() = 'professor')
-  with check (academia_id = auth_academia_id() and auth_role() = 'professor');
+create policy "aulas_canceladas_write_staff" on aulas_canceladas
+  for all using (academia_id = auth_academia_id() and auth_role() in ('professor', 'admin'))
+  with check (academia_id = auth_academia_id() and auth_role() in ('professor', 'admin'));
 
 -- ── Storage: buckets e policies ──────────────────────────────────────────
 -- Convenção de path: {academia_id}/{user_id}/arquivo.ext
@@ -511,7 +534,7 @@ create policy "documentos_leitura" on storage.objects
     bucket_id = 'documentos'
     and (
       (storage.foldername(name))[2] = auth.uid()::text
-      or (auth_role() = 'professor' and (storage.foldername(name))[1] = auth_academia_id()::text)
+      or (auth_role() in ('professor', 'admin') and (storage.foldername(name))[1] = auth_academia_id()::text)
     )
   );
 

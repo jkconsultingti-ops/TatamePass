@@ -21,7 +21,7 @@ import type { CampoTipo, Formulario, PerfilCampo } from '../../types/database'
 
 type CampoPatch = Partial<Pick<PerfilCampo, 'label' | 'obrigatorio' | 'tipo' | 'opcoes'>>
 
-export function ProfessorPerfilForm() {
+export function AdminPerfilForm() {
   const { profile } = useAuth()
   const queryClient = useQueryClient()
   const formulariosQuery = useFormularios(profile?.academia_id)

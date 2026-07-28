@@ -1,63 +1,8 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { useAuth } from '../../auth/AuthProvider'
-import { identificadorParaEmailAuth, emailValido, telefoneValido } from '../../lib/identificador'
-import { Button } from '../../components/Button'
 import { Stamp } from '../../components/Stamp'
-import { Label, Input, FieldError } from '../../components/Field'
-
-const credenciaisSchema = z.object({
-  identificador: z
-    .string()
-    .min(1, 'Informe seu e-mail ou telefone')
-    .refine((v) => emailValido(v) || telefoneValido(v), 'Informe um e-mail ou telefone válido'),
-  senha: z.string().min(6, 'A senha precisa ter pelo menos 6 caracteres'),
-})
-type CredenciaisForm = z.infer<typeof credenciaisSchema>
-
-type Modo = 'entrar' | 'criar-conta'
+import { FormularioCredenciais } from './FormularioCredenciais'
 
 export function Login() {
-  const { signInWithGoogle, signInWithPassword, signUpWithPassword } = useAuth()
-  const [modo, setModo] = useState<Modo>('entrar')
-  const [erro, setErro] = useState<string | null>(null)
-  const [mensagem, setMensagem] = useState<string | null>(null)
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<CredenciaisForm>({ resolver: zodResolver(credenciaisSchema) })
-
-  function trocarModo(novoModo: Modo) {
-    setModo(novoModo)
-    setErro(null)
-    setMensagem(null)
-    reset()
-  }
-
-  async function onSubmit(values: CredenciaisForm) {
-    setErro(null)
-    setMensagem(null)
-    try {
-      const tipo = emailValido(values.identificador) ? 'email' : 'telefone'
-      const email = identificadorParaEmailAuth(tipo, values.identificador)
-      if (modo === 'entrar') {
-        await signInWithPassword(email, values.senha)
-      } else {
-        const { precisaConfirmarEmail } = await signUpWithPassword(email, values.senha)
-        if (precisaConfirmarEmail) {
-          setMensagem('Conta criada! Verifique seu e-mail para confirmar antes de entrar.')
-        }
-      }
-    } catch (err) {
-      setErro(err instanceof Error ? err.message : 'Não foi possível continuar')
-    }
-  }
-
   return (
     <div className="flex min-h-svh flex-col items-center justify-center bg-ink px-6 py-12 text-center">
       <Stamp className="stamp-in h-24 w-24 text-hanko" />
@@ -68,65 +13,8 @@ export function Login() {
         A caderneta digital da sua academia. Cada aula frequentada, um carimbo.
       </p>
 
-      <div className="mt-10 w-full max-w-sm text-left">
-        <div className="mb-5 flex gap-1 rounded-sm border border-rope-dim/40 p-1">
-          <button
-            type="button"
-            onClick={() => trocarModo('entrar')}
-            className={`flex-1 rounded-sm py-2 font-mono text-xs uppercase tracking-wide transition-colors ${
-              modo === 'entrar' ? 'bg-hanko/15 text-hanko' : 'text-rope hover:text-chalk'
-            }`}
-          >
-            Entrar
-          </button>
-          <button
-            type="button"
-            onClick={() => trocarModo('criar-conta')}
-            className={`flex-1 rounded-sm py-2 font-mono text-xs uppercase tracking-wide transition-colors ${
-              modo === 'criar-conta' ? 'bg-hanko/15 text-hanko' : 'text-rope hover:text-chalk'
-            }`}
-          >
-            Criar conta
-          </button>
-        </div>
-
-        <form className="flex flex-col gap-4" onSubmit={handleSubmit(onSubmit)}>
-          <div>
-            <Label htmlFor="identificador">E-mail ou telefone</Label>
-            <Input
-              id="identificador"
-              placeholder="voce@exemplo.com ou (19) 99999-9999"
-              autoComplete="username"
-              {...register('identificador')}
-            />
-            <FieldError>{errors.identificador?.message}</FieldError>
-          </div>
-          <div>
-            <Label htmlFor="senha">Senha</Label>
-            <Input
-              id="senha"
-              type="password"
-              autoComplete={modo === 'entrar' ? 'current-password' : 'new-password'}
-              {...register('senha')}
-            />
-            <FieldError>{errors.senha?.message}</FieldError>
-          </div>
-          <FieldError>{erro ?? undefined}</FieldError>
-          {mensagem && <p className="font-mono text-xs text-mat-light">{mensagem}</p>}
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Aguarde…' : modo === 'entrar' ? 'Entrar' : 'Criar conta'}
-          </Button>
-        </form>
-
-        <div className="my-5 flex items-center gap-3">
-          <span className="h-px flex-1 bg-rope-dim/30" />
-          <span className="font-mono text-[11px] uppercase tracking-wide text-rope-dim">ou</span>
-          <span className="h-px flex-1 bg-rope-dim/30" />
-        </div>
-
-        <Button variant="secondary" onClick={() => signInWithGoogle()} className="w-full">
-          Entrar com Google
-        </Button>
+      <div className="mt-10">
+        <FormularioCredenciais />
       </div>
 
       <Link to="/privacidade" className="mt-8 font-mono text-xs text-rope hover:text-hanko">

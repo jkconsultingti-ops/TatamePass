@@ -14,23 +14,29 @@ SaaS multi-tenant de gestão de presença para academias de luta. Cada academia 
 ## Papéis de usuário
 
 - **Aluno**
-- **Professor** — acumula a função de admin da academia. Não existe papel de "Dono" separado.
+- **Professor** — opera o dia a dia (agenda, alunos, conceder graduação, aprovar exame médico); só visualiza turmas, não configura.
+- **Admin** — dono/gestor da academia. Tudo do professor, mais: cadastro de turmas, formulário de perfil, faixas de graduação, e cadastro/promoção de professores. Pode haver mais de um admin por academia. Ver [decisoes.md](./decisoes.md).
 
 ## Funcionalidades do aluno
 
-- [x] Check-in dentro de uma janela de tempo após o fim da aula, configurável pelo professor por turma
+- [x] Check-in dentro de uma janela de tempo antes/depois da aula, configurável pelo admin por turma
 - [x] Vínculo com uma turma principal, com check-in avulso em outras turmas (modelo híbrido)
-- [x] Perfil com formulário customizável (campos de texto + upload de documentos) definido pelo professor
+- [x] Cancelar o próprio check-in do dia
+- [x] Perfil com formulário customizável (múltiplos tipos de campo) definido pelo admin
 - [x] Foto de perfil
-- [x] Dashboard: histórico de aulas frequentadas, faixa atual (lista simples, sem gráficos)
 
-## Funcionalidades do professor (acumula admin)
+## Funcionalidades do professor
 
-- [x] Cadastro de turmas: nome, horário, professor responsável, janela de check-in
-- [x] Criação do formulário de perfil do aluno (campos de texto/documento, obrigatoriedade, ordem)
-- [x] Painel com todos os alunos e a presença de cada um
+- [x] Painel com todos os alunos e a presença de cada um, agenda mensal, cancelar aula com motivo
 - [x] Concessão manual de graduação de faixa (sem regra automática por número de presenças)
-- [x] Compartilhamento do código de convite da academia
+- [x] Aprovação de exame médico
+
+## Funcionalidades do admin (além de tudo do professor)
+
+- [x] Cadastro de turmas: nome, horário, dias da semana, janela de check-in
+- [x] Criação do formulário de perfil do aluno (campos de texto/documento/múltipla escolha, obrigatoriedade, ordem)
+- [x] Links de convite (aluno e professor) prontos pra compartilhar
+- [x] Cadastro/promoção de professores (promover a admin, rebaixar a professor)
 
 ### Notificações — fora desta entrega
 

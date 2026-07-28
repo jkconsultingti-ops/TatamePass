@@ -1,6 +1,7 @@
 import { createBrowserRouter } from 'react-router-dom'
 import { GuestRoute, OnboardingRoute, ProtectedRoute, CatchAllRedirect } from './auth/ProtectedRoute'
 import { Login } from './features/onboarding/Login'
+import { ConviteEntrar } from './features/onboarding/ConviteEntrar'
 import { PoliticaPrivacidade } from './features/legal/PoliticaPrivacidade'
 import { Onboarding } from './features/onboarding/Onboarding'
 import { AlunoLayout } from './features/aluno/AlunoLayout'
@@ -10,12 +11,15 @@ import { AlunoTurmas } from './features/aluno/AlunoTurmas'
 import { AlunoGraduacao } from './features/aluno/AlunoGraduacao'
 import { ProfessorLayout } from './features/professor/ProfessorLayout'
 import { ProfessorDashboard } from './features/professor/ProfessorDashboard'
-import { ProfessorTurmas } from './features/professor/ProfessorTurmas'
 import { ProfessorAgenda } from './features/professor/ProfessorAgenda'
 import { ProfessorAlunos } from './features/professor/ProfessorAlunos'
 import { ProfessorAlunoDetalhe } from './features/professor/ProfessorAlunoDetalhe'
 import { ProfessorGraduacao } from './features/professor/ProfessorGraduacao'
-import { ProfessorPerfilForm } from './features/professor/ProfessorPerfilForm'
+import { AdminLayout } from './features/admin/AdminLayout'
+import { AdminDashboard } from './features/admin/AdminDashboard'
+import { AdminTurmas } from './features/admin/AdminTurmas'
+import { AdminProfessores } from './features/admin/AdminProfessores'
+import { AdminPerfilForm } from './features/admin/AdminPerfilForm'
 
 export const router = createBrowserRouter([
   {
@@ -26,6 +30,7 @@ export const router = createBrowserRouter([
     element: <OnboardingRoute />,
     children: [{ path: '/onboarding', element: <Onboarding /> }],
   },
+  { path: '/convite/:codigo', element: <ConviteEntrar /> },
   {
     element: <ProtectedRoute role="aluno" />,
     children: [
@@ -48,11 +53,27 @@ export const router = createBrowserRouter([
         children: [
           { path: '/professor', element: <ProfessorDashboard /> },
           { path: '/professor/agenda', element: <ProfessorAgenda /> },
-          { path: '/professor/turmas', element: <ProfessorTurmas /> },
           { path: '/professor/alunos', element: <ProfessorAlunos /> },
           { path: '/professor/alunos/:id', element: <ProfessorAlunoDetalhe /> },
           { path: '/professor/graduacao', element: <ProfessorGraduacao /> },
-          { path: '/professor/perfil-form', element: <ProfessorPerfilForm /> },
+        ],
+      },
+    ],
+  },
+  {
+    element: <ProtectedRoute role="admin" />,
+    children: [
+      {
+        element: <AdminLayout />,
+        children: [
+          { path: '/admin', element: <AdminDashboard /> },
+          { path: '/admin/agenda', element: <ProfessorAgenda /> },
+          { path: '/admin/turmas', element: <AdminTurmas /> },
+          { path: '/admin/alunos', element: <ProfessorAlunos /> },
+          { path: '/admin/alunos/:id', element: <ProfessorAlunoDetalhe /> },
+          { path: '/admin/professores', element: <AdminProfessores /> },
+          { path: '/admin/graduacao', element: <ProfessorGraduacao /> },
+          { path: '/admin/perfil-form', element: <AdminPerfilForm /> },
         ],
       },
     ],

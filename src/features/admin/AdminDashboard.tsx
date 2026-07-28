@@ -8,12 +8,26 @@ import { Button } from '../../components/Button'
 import { hojeISO } from '../../lib/checkin'
 import { useAulasCanceladas, aulaCanceladaEm } from '../../lib/aulas'
 import { InstalarAppCard } from '../../components/InstalarAppCard'
-import type { Profile, Checkin, Turma, AulaCancelada } from '../../types/database'
+import type { Profile, Checkin, Turma, Academia, AulaCancelada } from '../../types/database'
 
-export function ProfessorDashboard() {
+export function AdminDashboard() {
   const { profile } = useAuth()
   const queryClient = useQueryClient()
   const [erro, setErro] = useState<string | null>(null)
+
+  const academiaQuery = useQuery({
+    queryKey: ['academia', profile?.academia_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('academias')
+        .select('*')
+        .eq('id', profile!.academia_id)
+        .single()
+      if (error) throw error
+      return data as Academia
+    },
+    enabled: !!profile,
+  })
 
   const alunosQuery = useQuery({
     queryKey: ['alunos', profile?.academia_id],
@@ -89,6 +103,16 @@ export function ProfessorDashboard() {
 
       <h1 className="font-display text-2xl font-semibold text-chalk">Painel</h1>
 
+      {academiaQuery.data && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <LinkConvite titulo="Convite para aluno" codigo={academiaQuery.data.codigo_convite} />
+          <LinkConvite
+            titulo="Convite para professor"
+            codigo={academiaQuery.data.codigo_convite_professor}
+          />
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card>
           <p className="font-mono text-xs uppercase tracking-wide text-rope">Alunos</p>
@@ -123,15 +147,42 @@ export function ProfessorDashboard() {
         {erro && <p className="mt-2 font-mono text-xs text-hanko">{erro}</p>}
       </section>
 
-      <div className="flex gap-4">
-        <Link to="/professor/alunos" className="font-mono text-xs text-rope hover:text-hanko">
+      <div className="flex flex-wrap gap-4">
+        <Link to="/admin/alunos" className="font-mono text-xs text-rope hover:text-hanko">
           ver todos os alunos →
         </Link>
-        <Link to="/professor/agenda" className="font-mono text-xs text-rope hover:text-hanko">
-          ver agenda →
+        <Link to="/admin/turmas" className="font-mono text-xs text-rope hover:text-hanko">
+          gerenciar turmas →
+        </Link>
+        <Link to="/admin/professores" className="font-mono text-xs text-rope hover:text-hanko">
+          gerenciar professores →
         </Link>
       </div>
     </div>
+  )
+}
+
+function LinkConvite({ titulo, codigo }: { titulo: string; codigo: string }) {
+  const [copiado, setCopiado] = useState(false)
+  const link = `${window.location.origin}/convite/${codigo}`
+
+  return (
+    <Card className="flex flex-wrap items-center justify-between gap-3">
+      <div className="min-w-0">
+        <p className="font-mono text-xs uppercase tracking-wide text-rope">{titulo}</p>
+        <p className="mt-1 truncate font-mono text-sm text-hanko">{link}</p>
+      </div>
+      <Button
+        variant="secondary"
+        onClick={async () => {
+          await navigator.clipboard.writeText(link)
+          setCopiado(true)
+          setTimeout(() => setCopiado(false), 1500)
+        }}
+      >
+        {copiado ? 'Copiado ✓' : 'Copiar link'}
+      </Button>
+    </Card>
   )
 }
 

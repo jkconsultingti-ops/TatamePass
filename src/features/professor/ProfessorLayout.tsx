@@ -4,10 +4,8 @@ import { AppShell } from '../../components/AppShell'
 const nav = [
   { to: '/professor', label: 'Painel' },
   { to: '/professor/agenda', label: 'Agenda' },
-  { to: '/professor/turmas', label: 'Turmas' },
   { to: '/professor/alunos', label: 'Alunos' },
   { to: '/professor/graduacao', label: 'Graduação' },
-  { to: '/professor/perfil-form', label: 'Formulário' },
 ]
 
 export function ProfessorLayout() {
