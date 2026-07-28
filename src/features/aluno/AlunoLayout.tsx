@@ -4,6 +4,7 @@ import { AppShell } from '../../components/AppShell'
 const nav = [
   { to: '/aluno', label: 'Check-in' },
   { to: '/aluno/turmas', label: 'Turmas' },
+  { to: '/aluno/graduacao', label: 'Graduação' },
   { to: '/aluno/perfil', label: 'Perfil' },
 ]
 

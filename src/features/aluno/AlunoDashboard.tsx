@@ -5,10 +5,12 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../auth/AuthProvider'
 import { statusCheckin, hojeISO } from '../../lib/checkin'
 import { useAulasCanceladas, aulaCanceladaEm } from '../../lib/aulas'
+import { useFaixasConfig } from '../../lib/graduacao'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
 import { Badge } from '../../components/Badge'
 import { Stamp } from '../../components/Stamp'
+import { InstalarAppCard } from '../../components/InstalarAppCard'
 import type { Turma, Checkin, Graduacao, AulaCancelada } from '../../types/database'
 
 export function AlunoDashboard() {
@@ -43,6 +45,7 @@ export function AlunoDashboard() {
   })
 
   const canceladasQuery = useAulasCanceladas(profile?.academia_id)
+  const faixasQuery = useFaixasConfig()
 
   const graduacoesQuery = useQuery({
     queryKey: ['graduacoes', profile?.id],
@@ -112,19 +115,22 @@ export function AlunoDashboard() {
   }
 
   const faixaAtual = graduacoesQuery.data?.[0]
+  const nomeFaixaAtual = faixasQuery.data?.find((f) => f.id === faixaAtual?.faixa_id)?.nome
 
   return (
     <div className="flex flex-col gap-6">
+      <InstalarAppCard />
+
       <section>
         <h1 className="font-display text-2xl font-semibold text-chalk">
           Olá, {profile?.nome?.split(' ')[0]}
         </h1>
         <p className="mt-2 text-sm text-rope">
-          {faixaAtual ? (
+          {faixaAtual && nomeFaixaAtual ? (
             <>
               Faixa atual:{' '}
               <Badge tone="mat">
-                {faixaAtual.faixa}
+                {nomeFaixaAtual}
                 {faixaAtual.grau ? ` · grau ${faixaAtual.grau}` : ''}
               </Badge>
             </>

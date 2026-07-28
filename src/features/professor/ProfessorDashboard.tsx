@@ -7,6 +7,7 @@ import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
 import { hojeISO } from '../../lib/checkin'
 import { useAulasCanceladas, aulaCanceladaEm } from '../../lib/aulas'
+import { InstalarAppCard } from '../../components/InstalarAppCard'
 import type { Profile, Checkin, Turma, Academia, AulaCancelada } from '../../types/database'
 
 export function ProfessorDashboard() {
@@ -99,6 +100,8 @@ export function ProfessorDashboard() {
 
   return (
     <div className="flex flex-col gap-6">
+      <InstalarAppCard />
+
       <h1 className="font-display text-2xl font-semibold text-chalk">Painel</h1>
 
       {academiaQuery.data && (

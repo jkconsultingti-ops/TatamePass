@@ -8,11 +8,13 @@ import { useAuth } from '../../auth/AuthProvider'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
 import { Label, Input, FieldError } from '../../components/Field'
-import { DIAS_SEMANA } from '../../types/database'
-import type { Turma } from '../../types/database'
+import { Badge } from '../../components/Badge'
+import { DIAS_SEMANA, ROTULO_TIPO_TURMA } from '../../types/database'
+import type { Turma, TipoTurma } from '../../types/database'
 
 const turmaSchema = z.object({
   nome: z.string().min(2, 'Informe o nome da turma'),
+  tipo_turma: z.enum(['adulto', 'infantil']),
   dias_semana: z.array(z.number().min(0).max(6)).min(1, 'Selecione pelo menos um dia'),
   horario_inicio: z.string().min(1, 'Informe o horário de início'),
   horario_fim: z.string().min(1, 'Informe o horário de término'),
@@ -77,8 +79,11 @@ export function ProfessorTurmas() {
         {turmasQuery.data?.map((turma) => (
           <Card key={turma.id} className="flex items-center justify-between gap-4">
             <div>
-              <p className="font-medium text-chalk">{turma.nome}</p>
-              <p className="font-mono text-xs text-rope">
+              <div className="flex items-center gap-2">
+                <p className="font-medium text-chalk">{turma.nome}</p>
+                <Badge tone="neutral">{ROTULO_TIPO_TURMA[turma.tipo_turma]}</Badge>
+              </div>
+              <p className="mt-1 font-mono text-xs text-rope">
                 {turma.dias_semana.map((d) => DIAS_SEMANA[d].slice(0, 3)).join(', ')} ·{' '}
                 {turma.horario_inicio.slice(0, 5)}–{turma.horario_fim.slice(0, 5)} · check-in{' '}
                 {turma.janela_checkin_antes_horas}h antes – {turma.janela_checkin_depois_horas}h depois
@@ -123,6 +128,7 @@ function TurmaFormulario({
     defaultValues: turma
       ? {
           nome: turma.nome,
+          tipo_turma: turma.tipo_turma,
           dias_semana: turma.dias_semana,
           horario_inicio: turma.horario_inicio.slice(0, 5),
           horario_fim: turma.horario_fim.slice(0, 5),
@@ -131,6 +137,7 @@ function TurmaFormulario({
         }
       : {
           nome: '',
+          tipo_turma: 'adulto',
           dias_semana: [1],
           horario_inicio: '19:00',
           horario_fim: '20:00',
@@ -168,6 +175,21 @@ function TurmaFormulario({
           <Label htmlFor="nome-turma">Nome</Label>
           <Input id="nome-turma" placeholder="Ex: Jiu-jitsu adulto" {...register('nome')} />
           <FieldError>{errors.nome?.message}</FieldError>
+        </div>
+        <div>
+          <Label htmlFor="tipo-turma">Tipo de turma</Label>
+          <select
+            id="tipo-turma"
+            className="w-full rounded-sm border border-rope-dim/50 bg-ink px-3.5 py-2.5 text-sm text-chalk focus:border-hanko focus:outline-none focus:ring-1 focus:ring-hanko"
+            {...register('tipo_turma')}
+          >
+            {(['adulto', 'infantil'] satisfies TipoTurma[]).map((tipo) => (
+              <option key={tipo} value={tipo}>
+                {ROTULO_TIPO_TURMA[tipo]}
+              </option>
+            ))}
+          </select>
+          <FieldError>{errors.tipo_turma?.message}</FieldError>
         </div>
         <div>
           <Label>Dias de atendimento</Label>

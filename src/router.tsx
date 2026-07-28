@@ -1,17 +1,20 @@
 import { createBrowserRouter } from 'react-router-dom'
 import { GuestRoute, OnboardingRoute, ProtectedRoute, CatchAllRedirect } from './auth/ProtectedRoute'
 import { Login } from './features/onboarding/Login'
+import { PoliticaPrivacidade } from './features/legal/PoliticaPrivacidade'
 import { Onboarding } from './features/onboarding/Onboarding'
 import { AlunoLayout } from './features/aluno/AlunoLayout'
 import { AlunoDashboard } from './features/aluno/AlunoDashboard'
 import { AlunoPerfil } from './features/aluno/AlunoPerfil'
 import { AlunoTurmas } from './features/aluno/AlunoTurmas'
+import { AlunoGraduacao } from './features/aluno/AlunoGraduacao'
 import { ProfessorLayout } from './features/professor/ProfessorLayout'
 import { ProfessorDashboard } from './features/professor/ProfessorDashboard'
 import { ProfessorTurmas } from './features/professor/ProfessorTurmas'
 import { ProfessorAgenda } from './features/professor/ProfessorAgenda'
 import { ProfessorAlunos } from './features/professor/ProfessorAlunos'
 import { ProfessorAlunoDetalhe } from './features/professor/ProfessorAlunoDetalhe'
+import { ProfessorGraduacao } from './features/professor/ProfessorGraduacao'
 import { ProfessorPerfilForm } from './features/professor/ProfessorPerfilForm'
 
 export const router = createBrowserRouter([
@@ -32,6 +35,7 @@ export const router = createBrowserRouter([
           { path: '/aluno', element: <AlunoDashboard /> },
           { path: '/aluno/perfil', element: <AlunoPerfil /> },
           { path: '/aluno/turmas', element: <AlunoTurmas /> },
+          { path: '/aluno/graduacao', element: <AlunoGraduacao /> },
         ],
       },
     ],
@@ -47,11 +51,13 @@ export const router = createBrowserRouter([
           { path: '/professor/turmas', element: <ProfessorTurmas /> },
           { path: '/professor/alunos', element: <ProfessorAlunos /> },
           { path: '/professor/alunos/:id', element: <ProfessorAlunoDetalhe /> },
+          { path: '/professor/graduacao', element: <ProfessorGraduacao /> },
           { path: '/professor/perfil-form', element: <ProfessorPerfilForm /> },
         ],
       },
     ],
   },
+  { path: '/privacidade', element: <PoliticaPrivacidade /> },
   { path: '/', element: <CatchAllRedirect /> },
   { path: '*', element: <CatchAllRedirect /> },
 ])

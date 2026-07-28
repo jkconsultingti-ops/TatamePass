@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../auth/AuthProvider'
 import { useFormularios, formularioPadrao, decodeCaixas, encodeCaixas } from '../../lib/formularios'
+import { statusExameMedico, ROTULO_STATUS_EXAME, TONE_STATUS_EXAME } from '../../lib/exameMedico'
+import { formatarData } from '../../lib/datas'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
+import { Badge } from '../../components/Badge'
 import { Label, Input, Textarea } from '../../components/Field'
-import type { PerfilCampo, PerfilResposta, Turma } from '../../types/database'
+import type { PerfilCampo, PerfilResposta, Turma, ExameMedico } from '../../types/database'
 
 export function AlunoPerfil() {
   const { profile, refreshProfile } = useAuth()
@@ -19,6 +23,8 @@ export function AlunoPerfil() {
   const [turmaSalvando, setTurmaSalvando] = useState(false)
   const [nome, setNome] = useState(profile?.nome ?? '')
   const [nomeSalvando, setNomeSalvando] = useState(false)
+  const [arquivoExame, setArquivoExame] = useState<File | null>(null)
+  const [exameSalvando, setExameSalvando] = useState(false)
 
   useEffect(() => setNome(profile?.nome ?? ''), [profile?.nome])
 
@@ -58,6 +64,20 @@ export function AlunoPerfil() {
       const { data, error } = await supabase.from('turmas').select('*').order('nome')
       if (error) throw error
       return data as Turma[]
+    },
+    enabled: !!profile,
+  })
+
+  const exameQuery = useQuery({
+    queryKey: ['exame_medico', profile?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('exames_medicos')
+        .select('*')
+        .eq('aluno_id', profile!.id)
+        .maybeSingle()
+      if (error) throw error
+      return data as ExameMedico | null
     },
     enabled: !!profile,
   })
@@ -202,8 +222,46 @@ export function AlunoPerfil() {
     }
   }
 
+  async function enviarExameArquivo(arquivo: File) {
+    if (!profile) return
+    const caminho = `${profile.academia_id}/${profile.id}/exame-medico-${arquivo.name}`
+    const { error } = await supabase.storage.from('documentos').upload(caminho, arquivo, { upsert: true })
+    if (error) throw error
+    return caminho
+  }
+
+  async function salvarExame() {
+    if (!profile || !arquivoExame) return
+    setExameSalvando(true)
+    setMensagem(null)
+    try {
+      const arquivo_url = await enviarExameArquivo(arquivoExame)
+      const { error } = await supabase.from('exames_medicos').upsert(
+        {
+          aluno_id: profile.id,
+          academia_id: profile.academia_id,
+          status: 'pendente',
+          solicitado_em: new Date().toISOString(),
+          arquivo_url,
+          atualizado_por: profile.id,
+        },
+        { onConflict: 'aluno_id' },
+      )
+      if (error) throw error
+      await queryClient.invalidateQueries({ queryKey: ['exame_medico', profile.id] })
+      setArquivoExame(null)
+      setMensagem('Enviado para análise do professor.')
+    } catch (err) {
+      setMensagem(err instanceof Error ? err.message : 'Não foi possível enviar o exame médico')
+    } finally {
+      setExameSalvando(false)
+    }
+  }
+
   const documentoExistente = (campoId: string) =>
     respostasQuery.data?.find((r) => r.campo_id === campoId)?.arquivo_url
+
+  const statusExame = statusExameMedico(exameQuery.data)
 
   return (
     <div className="flex flex-col gap-6">
@@ -255,6 +313,47 @@ export function AlunoPerfil() {
             </option>
           ))}
         </select>
+      </Card>
+
+      <Card>
+        <div className="mb-3 flex items-center justify-between">
+          <Label className="mb-0">Exame médico</Label>
+          <Badge tone={TONE_STATUS_EXAME[statusExame]}>{ROTULO_STATUS_EXAME[statusExame]}</Badge>
+        </div>
+
+        {exameQuery.data?.status === 'aprovado' && exameQuery.data.validade && (
+          <p className="mb-3 text-sm text-rope">
+            Válido até{' '}
+            <span className="font-medium text-chalk">{formatarData(exameQuery.data.validade)}</span>. Só
+            precisa enviar de novo quando estiver perto de vencer.
+          </p>
+        )}
+        {statusExame === 'pendente' && (
+          <p className="mb-3 text-sm text-rope">
+            Sua submissão está com o professor, aguardando aprovação e definição da validade.
+          </p>
+        )}
+
+        {statusExame !== 'pendente' && statusExame !== 'em-dia' && (
+          <div className="flex flex-col gap-4">
+            <div>
+              <Label htmlFor="exame-arquivo">Atestado médico (PDF, foto ou imagem) *</Label>
+              <input
+                id="exame-arquivo"
+                type="file"
+                accept="application/pdf,image/*"
+                onChange={(e) => setArquivoExame(e.target.files?.[0] ?? null)}
+                className="text-xs text-rope"
+              />
+              {exameQuery.data?.arquivo_url && !arquivoExame && (
+                <p className="mt-1 font-mono text-xs text-mat-light">Atestado enviado ✓</p>
+              )}
+            </div>
+            <Button disabled={exameSalvando || !arquivoExame} onClick={salvarExame} className="self-start">
+              {exameSalvando ? 'Enviando…' : 'Enviar para análise'}
+            </Button>
+          </div>
+        )}
       </Card>
 
       {camposQuery.data?.map((campo) => (
@@ -367,6 +466,10 @@ export function AlunoPerfil() {
       ))}
 
       {mensagem && <p className="font-mono text-xs text-rope">{mensagem}</p>}
+
+      <Link to="/privacidade" className="self-start font-mono text-xs text-rope hover:text-hanko">
+        Política de Privacidade
+      </Link>
     </div>
   )
 }

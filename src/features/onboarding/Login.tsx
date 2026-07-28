@@ -1,14 +1,19 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useAuth } from '../../auth/AuthProvider'
+import { identificadorParaEmailAuth, emailValido, telefoneValido } from '../../lib/identificador'
 import { Button } from '../../components/Button'
 import { Stamp } from '../../components/Stamp'
 import { Label, Input, FieldError } from '../../components/Field'
 
 const credenciaisSchema = z.object({
-  email: z.string().min(1, 'Informe seu e-mail').email('E-mail inválido'),
+  identificador: z
+    .string()
+    .min(1, 'Informe seu e-mail ou telefone')
+    .refine((v) => emailValido(v) || telefoneValido(v), 'Informe um e-mail ou telefone válido'),
   senha: z.string().min(6, 'A senha precisa ter pelo menos 6 caracteres'),
 })
 type CredenciaisForm = z.infer<typeof credenciaisSchema>
@@ -38,10 +43,12 @@ export function Login() {
     setErro(null)
     setMensagem(null)
     try {
+      const tipo = emailValido(values.identificador) ? 'email' : 'telefone'
+      const email = identificadorParaEmailAuth(tipo, values.identificador)
       if (modo === 'entrar') {
-        await signInWithPassword(values.email, values.senha)
+        await signInWithPassword(email, values.senha)
       } else {
-        const { precisaConfirmarEmail } = await signUpWithPassword(values.email, values.senha)
+        const { precisaConfirmarEmail } = await signUpWithPassword(email, values.senha)
         if (precisaConfirmarEmail) {
           setMensagem('Conta criada! Verifique seu e-mail para confirmar antes de entrar.')
         }
@@ -85,9 +92,14 @@ export function Login() {
 
         <form className="flex flex-col gap-4" onSubmit={handleSubmit(onSubmit)}>
           <div>
-            <Label htmlFor="email">E-mail</Label>
-            <Input id="email" type="email" autoComplete="email" {...register('email')} />
-            <FieldError>{errors.email?.message}</FieldError>
+            <Label htmlFor="identificador">E-mail ou telefone</Label>
+            <Input
+              id="identificador"
+              placeholder="voce@exemplo.com ou (19) 99999-9999"
+              autoComplete="username"
+              {...register('identificador')}
+            />
+            <FieldError>{errors.identificador?.message}</FieldError>
           </div>
           <div>
             <Label htmlFor="senha">Senha</Label>
@@ -116,6 +128,10 @@ export function Login() {
           Entrar com Google
         </Button>
       </div>
+
+      <Link to="/privacidade" className="mt-8 font-mono text-xs text-rope hover:text-hanko">
+        Política de Privacidade
+      </Link>
     </div>
   )
 }

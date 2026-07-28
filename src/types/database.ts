@@ -23,7 +23,16 @@ export type Profile = {
   nome: string
   foto_url: string | null
   turma_principal_id: string | null
+  identificador_tipo: IdentificadorTipo | null
+  identificador_valor: string | null
   criado_em: string
+}
+
+export type TipoTurma = 'adulto' | 'infantil'
+
+export const ROTULO_TIPO_TURMA: Record<TipoTurma, string> = {
+  adulto: 'Adulto',
+  infantil: 'Infantil',
 }
 
 export type Turma = {
@@ -31,6 +40,7 @@ export type Turma = {
   academia_id: string
   nome: string
   professor_id: string
+  tipo_turma: TipoTurma
   dias_semana: number[]
   horario_inicio: string
   horario_fim: string
@@ -78,16 +88,46 @@ export type PerfilResposta = {
   atualizado_em: string
 }
 
+export type FaixaConfig = {
+  id: string
+  academia_id: string
+  nome: string
+  ordem: number
+  tipo_turma: TipoTurma
+  aulas_por_grau: number | null
+  graus_por_faixa: number | null
+  criado_em: string
+}
+
 export type Graduacao = {
   id: string
   aluno_id: string
-  faixa: string
+  faixa_id: string
   grau: number | null
   concedido_por: string
   concedido_em: string
   observacao: string | null
   criado_em: string
 }
+
+export type ExameMedicoStatus = 'pendente' | 'aprovado'
+
+export type ExameMedico = {
+  id: string
+  aluno_id: string
+  academia_id: string
+  status: ExameMedicoStatus
+  emitido_em: string | null
+  validade: string | null
+  arquivo_url: string | null
+  solicitado_em: string
+  aprovado_por: string | null
+  aprovado_em: string | null
+  atualizado_por: string
+  atualizado_em: string
+}
+
+export type IdentificadorTipo = 'email' | 'telefone'
 
 export type AulaCancelada = {
   id: string
@@ -111,7 +151,9 @@ export type Database = {
       formularios: TableOf<Formulario>
       perfil_campos: TableOf<PerfilCampo>
       perfil_respostas: TableOf<PerfilResposta>
+      faixas_config: TableOf<FaixaConfig>
       graduacoes: TableOf<Graduacao>
+      exames_medicos: TableOf<ExameMedico>
       aulas_canceladas: TableOf<AulaCancelada>
     }
     Views: Record<string, never>

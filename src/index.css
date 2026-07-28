@@ -39,6 +39,15 @@
 body {
   margin: 0;
   min-height: 100svh;
+  /* Sem elemento largo demais escondido em algum canto, o navegador não
+     tem pra onde rolar/arrastar de lado — trava isso de vez. */
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+  /* Permite rolar a página normalmente, mas remove o pinch-zoom no Safari
+     (que ignora o "user-scalable=no" do viewport por padrão de acessibilidade
+     — isso aqui é reforçado em JS em main.tsx pros gestos que o Safari usa
+     por fora do touch-action padrão). */
+  touch-action: pan-x pan-y;
 }
 
 #root {
@@ -80,5 +89,17 @@ h3 {
 @media (prefers-reduced-motion: reduce) {
   .stamp-in {
     animation: none;
+  }
+}
+
+/* iOS/Android abrem zoom automático ao focar um campo com fonte < 16px —
+   com o viewport travado acima, isso deixava a página "presa" no zoom. Só
+   se aplica no tamanho de tela mobile pra não mudar o visual (text-sm) das
+   telas maiores. */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
   }
 }

@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../auth/AuthProvider'
+import { identificadorDeSessao } from '../../lib/identificador'
 import { Button } from '../../components/Button'
 import { Card } from '../../components/Card'
 import { Stamp } from '../../components/Stamp'
@@ -81,12 +82,15 @@ export function Onboarding() {
             }
             if (!academia) throw erro ?? new Error('Não foi possível criar a academia')
 
+            const { tipo, valor } = identificadorDeSessao(session.user.email!)
             const { error: profileError } = await supabase.from('profiles').insert({
               id: session.user.id,
               academia_id: academia.id,
               role: 'professor',
               nome: seuNome,
               foto_url: fotoDeGoogle(session.user),
+              identificador_tipo: tipo,
+              identificador_valor: valor,
             })
             if (profileError) throw profileError
 
@@ -112,12 +116,15 @@ export function Onboarding() {
           const academia = data?.[0]
           if (!academia) throw new Error('Código não encontrado. Confira com seu professor.')
 
+          const { tipo, valor } = identificadorDeSessao(session.user.email!)
           const { error: profileError } = await supabase.from('profiles').insert({
             id: session.user.id,
             academia_id: academia.academia_id,
             role: 'aluno',
             nome: seuNome,
             foto_url: fotoDeGoogle(session.user),
+            identificador_tipo: tipo,
+            identificador_valor: valor,
           })
           if (profileError) throw profileError
 

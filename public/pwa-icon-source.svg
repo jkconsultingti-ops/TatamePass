@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <rect width="120" height="120" fill="#14171f" />
+  <circle cx="60" cy="60" r="55" fill="none" stroke="#c1391f" stroke-width="3" />
+  <circle
+    cx="60"
+    cy="60"
+    r="46"
+    fill="none"
+    stroke="#c1391f"
+    stroke-width="1.5"
+    stroke-dasharray="1.5 4.5"
+  />
+  <text
+    x="60"
+    y="72"
+    text-anchor="middle"
+    font-family="Georgia, 'Fraunces', serif"
+    font-weight="700"
+    font-size="40"
+    fill="#c1391f"
+    transform="rotate(-4 60 60)"
+  >
+    TP
+  </text>
+</svg>
