@@ -25,8 +25,7 @@ drop function auth_role();
 
 -- ── role vira text + check em vez de enum ────────────────────────────────
 -- Mesmo motivo da 0004 com campo_tipo: evita a trava do Postgres de não
--- poder usar um valor de enum recém-criado na mesma transação — e já
--- precisamos usar 'admin' aqui embaixo pra promover quem já é professor.
+-- poder usar um valor de enum recém-criado na mesma transação.
 
 alter table profiles alter column role type text using role::text;
 
@@ -35,10 +34,6 @@ drop type user_role;
 alter table profiles
   add constraint profiles_role_check check (role in ('aluno', 'professor', 'admin'));
 
--- Todo professor que já existe hoje é, na prática, o admin da academia dele
--- (o modelo antigo era "professor acumula admin") — promove todos.
-update profiles set role = 'admin' where role = 'professor';
-
 create function auth_role()
 returns text
 language sql stable security definer set search_path = public as $$
@@ -46,6 +41,30 @@ language sql stable security definer set search_path = public as $$
 $$;
 
 grant execute on function auth_role() to authenticated;
+
+-- ── Trigger de profiles precisa ser relaxada ANTES de promover ninguém ──
+-- A trigger antiga bloqueia qualquer troca de role, sem exceção — se a
+-- gente rodar o UPDATE de promoção antes de redefinir a trigger, ela barra
+-- a própria migração. Redefine primeiro (permite quando quem faz a
+-- alteração é admin — rodando aqui direto no SQL Editor, sem JWT de app,
+-- auth_role() retorna null, e a condição `and auth_role() <> 'admin'` vira
+-- null, então também não bloqueia; é só na app, com RLS de verdade, que a
+-- checagem passa a valer).
+
+create or replace function prevent_profile_privilege_escalation()
+returns trigger
+language plpgsql as $$
+begin
+  if (new.role <> old.role or new.academia_id <> old.academia_id) and auth_role() <> 'admin' then
+    raise exception 'não é permitido alterar role ou academia_id do perfil';
+  end if;
+  return new;
+end;
+$$;
+
+-- Todo professor que já existe hoje é, na prática, o admin da academia dele
+-- (o modelo antigo era "professor acumula admin") — promove todos.
+update profiles set role = 'admin' where role = 'professor';
 
 -- ── Recria as policies derrubadas lá em cima, já com a nova regra ────────
 -- turmas/formularios/perfil_campos/faixas_config viram admin-only; o resto
@@ -124,6 +143,13 @@ create policy "documentos_leitura" on storage.objects
       or (auth_role() in ('professor', 'admin') and (storage.foldername(name))[1] = auth_academia_id()::text)
     )
   );
+
+-- Admin também pode atualizar qualquer perfil da própria academia (além do
+-- cada um atualizar o próprio, que já existe desde a 0001) — é o que
+-- permite promover/rebaixar outra pessoa depois, pela própria app.
+create policy "profiles_update_admin" on profiles
+  for update using (academia_id = auth_academia_id() and auth_role() = 'admin')
+  with check (academia_id = auth_academia_id() and auth_role() = 'admin');
 
 -- ── Convite por link: um token pra aluno, um pra professor ──────────────
 
@@ -204,22 +230,7 @@ grant execute on function create_academia(text, text, text) to authenticated;
 -- não sobrar uma versão que cria academia sem convite de professor.
 drop function if exists create_academia(text, text);
 
--- ── Admin pode promover/rebaixar gente da própria academia ──────────────
-
-create or replace function prevent_profile_privilege_escalation()
-returns trigger
-language plpgsql as $$
-begin
-  if (new.role <> old.role or new.academia_id <> old.academia_id) and auth_role() <> 'admin' then
-    raise exception 'não é permitido alterar role ou academia_id do perfil';
-  end if;
-  return new;
-end;
-$$;
-
-create policy "profiles_update_admin" on profiles
-  for update using (academia_id = auth_academia_id() and auth_role() = 'admin')
-  with check (academia_id = auth_academia_id() and auth_role() = 'admin');
+-- ── Exame médico: professor OU admin aprovam (antes só professor) ───────
 
 create or replace function prevent_exame_autoaprovacao()
 returns trigger
