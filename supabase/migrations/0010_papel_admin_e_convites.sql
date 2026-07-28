@@ -2,18 +2,33 @@
 -- link (um pra aluno, um pra professor) em vez de código digitado.
 -- Rodar no SQL Editor do Supabase depois da 0009_identificador_login.sql.
 
+-- ── Derruba antes toda policy que usa auth_role() ────────────────────────
+-- auth_role() vai trocar de retorno (user_role -> text), e o Postgres não
+-- deixa `create or replace` mudar tipo de retorno — precisa dropar a função,
+-- e pra isso precisa dropar antes tudo que depende dela (as policies abaixo,
+-- que referenciam a função direto na expressão USING/WITH CHECK).
+
+drop policy "turmas_write_professor" on turmas;
+drop policy "checkins_select" on checkins;
+drop policy "formularios_write_professor" on formularios;
+drop policy "perfil_campos_write_professor" on perfil_campos;
+drop policy "perfil_respostas_select_professor" on perfil_respostas;
+drop policy "faixas_config_update_professor" on faixas_config;
+drop policy "graduacoes_insert_professor" on graduacoes;
+drop policy "aulas_canceladas_write_professor" on aulas_canceladas;
+drop policy "exames_medicos_select" on exames_medicos;
+drop policy "exames_medicos_insert" on exames_medicos;
+drop policy "exames_medicos_update" on exames_medicos;
+drop policy "documentos_leitura" on storage.objects;
+
+drop function auth_role();
+
 -- ── role vira text + check em vez de enum ────────────────────────────────
 -- Mesmo motivo da 0004 com campo_tipo: evita a trava do Postgres de não
 -- poder usar um valor de enum recém-criado na mesma transação — e já
 -- precisamos usar 'admin' aqui embaixo pra promover quem já é professor.
 
 alter table profiles alter column role type text using role::text;
-
-create or replace function auth_role()
-returns text
-language sql stable security definer set search_path = public as $$
-  select role from profiles where id = auth.uid();
-$$;
 
 drop type user_role;
 
@@ -23,6 +38,92 @@ alter table profiles
 -- Todo professor que já existe hoje é, na prática, o admin da academia dele
 -- (o modelo antigo era "professor acumula admin") — promove todos.
 update profiles set role = 'admin' where role = 'professor';
+
+create function auth_role()
+returns text
+language sql stable security definer set search_path = public as $$
+  select role from profiles where id = auth.uid();
+$$;
+
+grant execute on function auth_role() to authenticated;
+
+-- ── Recria as policies derrubadas lá em cima, já com a nova regra ────────
+-- turmas/formularios/perfil_campos/faixas_config viram admin-only; o resto
+-- (operação do dia a dia) aceita professor OU admin.
+
+create policy "turmas_write_admin" on turmas
+  for all using (academia_id = auth_academia_id() and auth_role() = 'admin')
+  with check (academia_id = auth_academia_id() and auth_role() = 'admin');
+
+create policy "checkins_select" on checkins
+  for select using (
+    academia_id = auth_academia_id()
+    and (aluno_id = auth.uid() or auth_role() in ('professor', 'admin'))
+  );
+
+create policy "formularios_write_admin" on formularios
+  for all using (academia_id = auth_academia_id() and auth_role() = 'admin')
+  with check (academia_id = auth_academia_id() and auth_role() = 'admin');
+
+create policy "perfil_campos_write_admin" on perfil_campos
+  for all using (academia_id = auth_academia_id() and auth_role() = 'admin')
+  with check (academia_id = auth_academia_id() and auth_role() = 'admin');
+
+create policy "perfil_respostas_select_staff" on perfil_respostas
+  for select using (
+    auth_role() in ('professor', 'admin')
+    and exists (
+      select 1 from profiles p
+      where p.id = perfil_respostas.aluno_id and p.academia_id = auth_academia_id()
+    )
+  );
+
+create policy "faixas_config_update_admin" on faixas_config
+  for update using (academia_id = auth_academia_id() and auth_role() = 'admin')
+  with check (academia_id = auth_academia_id() and auth_role() = 'admin');
+
+create policy "graduacoes_insert_staff" on graduacoes
+  for insert to authenticated with check (
+    auth_role() in ('professor', 'admin')
+    and concedido_por = auth.uid()
+    and exists (
+      select 1 from profiles p
+      where p.id = graduacoes.aluno_id and p.academia_id = auth_academia_id()
+    )
+  );
+
+create policy "aulas_canceladas_write_staff" on aulas_canceladas
+  for all using (academia_id = auth_academia_id() and auth_role() in ('professor', 'admin'))
+  with check (academia_id = auth_academia_id() and auth_role() in ('professor', 'admin'));
+
+create policy "exames_medicos_select" on exames_medicos
+  for select using (
+    academia_id = auth_academia_id()
+    and (aluno_id = auth.uid() or auth_role() in ('professor', 'admin'))
+  );
+
+create policy "exames_medicos_insert" on exames_medicos
+  for insert to authenticated with check (
+    academia_id = auth_academia_id()
+    and (aluno_id = auth.uid() or auth_role() in ('professor', 'admin'))
+  );
+
+create policy "exames_medicos_update" on exames_medicos
+  for update using (
+    academia_id = auth_academia_id()
+    and (aluno_id = auth.uid() or auth_role() in ('professor', 'admin'))
+  );
+
+-- documentos: dono sempre lê o próprio; professor OU admin leem os da
+-- própria academia (antes só professor — faltava incluir admin).
+create policy "documentos_leitura" on storage.objects
+  for select to authenticated using (
+    bucket_id = 'documentos'
+    and (
+      (storage.foldername(name))[2] = auth.uid()::text
+      or (auth_role() in ('professor', 'admin') and (storage.foldername(name))[1] = auth_academia_id()::text)
+    )
+  );
 
 -- ── Convite por link: um token pra aluno, um pra professor ──────────────
 
@@ -119,84 +220,6 @@ $$;
 create policy "profiles_update_admin" on profiles
   for update using (academia_id = auth_academia_id() and auth_role() = 'admin')
   with check (academia_id = auth_academia_id() and auth_role() = 'admin');
-
--- ── Redistribui as policies que hoje checam só 'professor' ───────────────
--- turmas/formularios/perfil_campos/faixas_config viram admin-only; o resto
--- (operação do dia a dia) aceita professor OU admin.
-
-drop policy "turmas_write_professor" on turmas;
-create policy "turmas_write_admin" on turmas
-  for all using (academia_id = auth_academia_id() and auth_role() = 'admin')
-  with check (academia_id = auth_academia_id() and auth_role() = 'admin');
-
-drop policy "formularios_write_professor" on formularios;
-create policy "formularios_write_admin" on formularios
-  for all using (academia_id = auth_academia_id() and auth_role() = 'admin')
-  with check (academia_id = auth_academia_id() and auth_role() = 'admin');
-
-drop policy "perfil_campos_write_professor" on perfil_campos;
-create policy "perfil_campos_write_admin" on perfil_campos
-  for all using (academia_id = auth_academia_id() and auth_role() = 'admin')
-  with check (academia_id = auth_academia_id() and auth_role() = 'admin');
-
-drop policy "faixas_config_update_professor" on faixas_config;
-create policy "faixas_config_update_admin" on faixas_config
-  for update using (academia_id = auth_academia_id() and auth_role() = 'admin')
-  with check (academia_id = auth_academia_id() and auth_role() = 'admin');
-
-drop policy "checkins_select" on checkins;
-create policy "checkins_select" on checkins
-  for select using (
-    academia_id = auth_academia_id()
-    and (aluno_id = auth.uid() or auth_role() in ('professor', 'admin'))
-  );
-
-drop policy "perfil_respostas_select_professor" on perfil_respostas;
-create policy "perfil_respostas_select_staff" on perfil_respostas
-  for select using (
-    auth_role() in ('professor', 'admin')
-    and exists (
-      select 1 from profiles p
-      where p.id = perfil_respostas.aluno_id and p.academia_id = auth_academia_id()
-    )
-  );
-
-drop policy "graduacoes_insert_professor" on graduacoes;
-create policy "graduacoes_insert_staff" on graduacoes
-  for insert to authenticated with check (
-    auth_role() in ('professor', 'admin')
-    and concedido_por = auth.uid()
-    and exists (
-      select 1 from profiles p
-      where p.id = graduacoes.aluno_id and p.academia_id = auth_academia_id()
-    )
-  );
-
-drop policy "aulas_canceladas_write_professor" on aulas_canceladas;
-create policy "aulas_canceladas_write_staff" on aulas_canceladas
-  for all using (academia_id = auth_academia_id() and auth_role() in ('professor', 'admin'))
-  with check (academia_id = auth_academia_id() and auth_role() in ('professor', 'admin'));
-
-drop policy "exames_medicos_select" on exames_medicos;
-create policy "exames_medicos_select" on exames_medicos
-  for select using (
-    academia_id = auth_academia_id()
-    and (aluno_id = auth.uid() or auth_role() in ('professor', 'admin'))
-  );
-
-drop policy "exames_medicos_insert" on exames_medicos;
-create policy "exames_medicos_insert" on exames_medicos
-  for insert to authenticated with check (
-    academia_id = auth_academia_id()
-    and (aluno_id = auth.uid() or auth_role() in ('professor', 'admin'))
-  );
-
-drop policy "exames_medicos_update" on exames_medicos;
-create policy "exames_medicos_update" on exames_medicos
-  for update using (
-    academia_id = auth_academia_id()
-    and (aluno_id = auth.uid() or auth_role() in ('professor', 'admin'))
-  );
 
 create or replace function prevent_exame_autoaprovacao()
 returns trigger
