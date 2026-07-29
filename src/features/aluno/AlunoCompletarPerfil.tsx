@@ -147,14 +147,14 @@ export function AlunoCompletarPerfil() {
         </p>
 
         <h2 className="mt-6 font-mono text-xs uppercase tracking-[0.14em] text-rope-dim">Seus dados</h2>
-        <div className="mt-3 flex flex-col gap-4">
-          <Card>
+        <Card className="mt-3 flex flex-col divide-y divide-rope-dim/20">
+          <div className="pb-4">
             <Label htmlFor="nome-completo">Nome completo *</Label>
             <Input id="nome-completo" value={nome} onChange={(e) => setNome(e.target.value)} />
-          </Card>
+          </div>
 
           {campos.map((campo) => (
-            <Card key={campo.id}>
+            <div key={campo.id} className="py-4 first:pt-0 last:pb-0">
               <Label htmlFor={campo.id}>
                 {campo.label}
                 {campo.obrigatorio ? ' *' : ''}
@@ -167,9 +167,11 @@ export function AlunoCompletarPerfil() {
                 documentoEnviado={!!documentoExistente(campo.id)}
                 enviandoArquivo={uploadCampo === campo.id}
               />
-            </Card>
+            </div>
           ))}
+        </Card>
 
+        <div className="mt-4 flex flex-col gap-4">
           {faltando.length > 0 && (
             <p className="font-mono text-xs text-hanko">
               Faltam: {faltando.join(', ')}

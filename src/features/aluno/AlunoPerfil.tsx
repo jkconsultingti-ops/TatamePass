@@ -338,33 +338,35 @@ export function AlunoPerfil() {
 
       <h2 className="font-mono text-xs uppercase tracking-[0.14em] text-rope-dim">Seus dados</h2>
 
-      <Card>
-        <Label htmlFor="nome-completo">Nome completo</Label>
-        <Input id="nome-completo" value={nome} onChange={(e) => setNome(e.target.value)} />
-      </Card>
+      <Card className="flex flex-col divide-y divide-rope-dim/20">
+        <div className="pb-4">
+          <Label htmlFor="nome-completo">Nome completo</Label>
+          <Input id="nome-completo" value={nome} onChange={(e) => setNome(e.target.value)} />
+        </div>
 
-      {camposQuery.data?.map((campo) => {
-        const salvaEmLote = CAMPOS_COM_SALVAR_EM_LOTE.includes(campo.tipo)
-        return (
-          <Card key={campo.id}>
-            <Label htmlFor={campo.id}>
-              {campo.label}
-              {campo.obrigatorio ? ' *' : ''}
-            </Label>
-            <CampoPerfilInput
-              campo={campo}
-              valor={valores[campo.id] ?? ''}
-              onChange={(valor) => {
-                setValores((v) => ({ ...v, [campo.id]: valor }))
-                if (!salvaEmLote) salvarValorDireto(campo, valor)
-              }}
-              onArquivo={(arquivo) => enviarDocumento(campo, arquivo)}
-              documentoEnviado={!!documentoExistente(campo.id)}
-              enviandoArquivo={uploadCampo === campo.id}
-            />
-          </Card>
-        )
-      })}
+        {camposQuery.data?.map((campo) => {
+          const salvaEmLote = CAMPOS_COM_SALVAR_EM_LOTE.includes(campo.tipo)
+          return (
+            <div key={campo.id} className="py-4 first:pt-0 last:pb-0">
+              <Label htmlFor={campo.id}>
+                {campo.label}
+                {campo.obrigatorio ? ' *' : ''}
+              </Label>
+              <CampoPerfilInput
+                campo={campo}
+                valor={valores[campo.id] ?? ''}
+                onChange={(valor) => {
+                  setValores((v) => ({ ...v, [campo.id]: valor }))
+                  if (!salvaEmLote) salvarValorDireto(campo, valor)
+                }}
+                onArquivo={(arquivo) => enviarDocumento(campo, arquivo)}
+                documentoEnviado={!!documentoExistente(campo.id)}
+                enviandoArquivo={uploadCampo === campo.id}
+              />
+            </div>
+          )
+        })}
+      </Card>
 
       <Button onClick={salvarTudo} disabled={salvandoTudo} className="self-start">
         {salvandoTudo ? 'Salvando…' : 'Salvar alterações'}
