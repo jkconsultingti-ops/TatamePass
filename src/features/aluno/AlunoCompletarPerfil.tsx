@@ -146,7 +146,8 @@ export function AlunoCompletarPerfil() {
           Só falta preencher os dados abaixo pra liberar seu acesso.
         </p>
 
-        <div className="mt-6 flex flex-col gap-4">
+        <h2 className="mt-6 font-mono text-xs uppercase tracking-[0.14em] text-rope-dim">Seus dados</h2>
+        <div className="mt-3 flex flex-col gap-4">
           <Card>
             <Label htmlFor="nome-completo">Nome completo *</Label>
             <Input id="nome-completo" value={nome} onChange={(e) => setNome(e.target.value)} />

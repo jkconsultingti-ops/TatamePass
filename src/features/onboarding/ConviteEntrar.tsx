@@ -80,7 +80,9 @@ export function ConviteEntrar() {
         if (error) throw error
 
         await refreshProfile()
-        if (ativo) navigate(homePathFor(convite!.role), { replace: true })
+        if (!ativo) return
+        const destino = convite!.role === 'aluno' ? '/aluno/completar-perfil' : homePathFor(convite!.role)
+        navigate(destino, { replace: true })
       } catch (err) {
         if (ativo) {
           setErroEntrada(err instanceof Error ? err.message : 'Não foi possível entrar na academia')
@@ -138,6 +140,7 @@ export function ConviteEntrar() {
         )
       ) : (
         <div className="mt-6">
+          <h2 className="mb-3 font-mono text-xs uppercase tracking-[0.14em] text-rope-dim">Conta</h2>
           <FormularioCredenciais mensagemConfirmarEmail="Conta criada! Verifique seu e-mail e volte a abrir este link pra entrar na academia." />
         </div>
       )}
