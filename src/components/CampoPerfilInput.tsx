@@ -1,5 +1,7 @@
+import { Paperclip } from 'lucide-react'
 import { decodeCaixas, encodeCaixas } from '../lib/formularios'
 import { Input, Textarea } from './Field'
+import { FileButton } from './FileButton'
 import type { PerfilCampo } from '../types/database'
 
 /** Renderiza só o input de um campo de perfil, sem label nem botão de
@@ -100,12 +102,11 @@ export function CampoPerfilInput({
       return (
         <div className="flex flex-col gap-2">
           {documentoEnviado && <p className="font-mono text-xs text-mat-light">Documento enviado ✓</p>}
-          <input
-            id={campo.id}
-            type="file"
+          <FileButton
             disabled={enviandoArquivo}
-            onChange={(e) => e.target.files?.[0] && onArquivo(e.target.files[0])}
-            className="text-xs text-rope"
+            onSelect={onArquivo}
+            label={enviandoArquivo ? 'Enviando…' : 'Escolher arquivo'}
+            icon={<Paperclip className="h-4 w-4" />}
           />
         </div>
       )

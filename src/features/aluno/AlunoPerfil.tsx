@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Camera, Paperclip } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../auth/AuthProvider'
@@ -11,6 +12,7 @@ import { Button } from '../../components/Button'
 import { Badge } from '../../components/Badge'
 import { Label, Input } from '../../components/Field'
 import { CampoPerfilInput } from '../../components/CampoPerfilInput'
+import { FileButton } from '../../components/FileButton'
 import type { PerfilCampo, PerfilResposta, Turma, ExameMedico } from '../../types/database'
 
 /** Tipos cujo valor só grava quando o aluno aperta "Salvar alterações" — os
@@ -259,95 +261,85 @@ export function AlunoPerfil() {
     <div className="flex flex-col gap-6">
       <h1 className="font-display text-2xl font-semibold text-chalk">Meu perfil</h1>
 
-      <Card className="flex items-center gap-4">
-        <label
-          htmlFor="foto"
-          className={`group relative block h-16 w-16 shrink-0 overflow-hidden rounded-full ${fotoEnviando ? 'cursor-wait' : 'cursor-pointer'}`}
-        >
+      <Card className="flex flex-col divide-y divide-rope-dim/20">
+        <div className="flex items-center gap-4 pb-4">
           {profile?.foto_url ? (
             <img src={profile.foto_url} alt="" className="h-16 w-16 rounded-full object-cover" />
           ) : (
             <div className="h-16 w-16 rounded-full bg-ink" />
           )}
-          <div
-            className={`absolute inset-0 flex items-center justify-center rounded-full bg-ink/70 px-1 text-center font-mono text-[9px] uppercase leading-tight tracking-wide text-chalk backdrop-blur-sm transition-opacity ${
-              fotoEnviando ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-            }`}
+          <div className="flex flex-col gap-1.5">
+            <FileButton
+              accept="image/*"
+              disabled={fotoEnviando}
+              onSelect={trocarFoto}
+              label={fotoEnviando ? 'Enviando…' : 'Trocar foto'}
+              icon={<Camera className="h-4 w-4" />}
+            />
+            <p className="font-mono text-[11px] text-rope-dim">JPG, PNG ou WebP</p>
+          </div>
+        </div>
+
+        <div className="py-4">
+          <Label htmlFor="turma-principal">Turma principal</Label>
+          <select
+            id="turma-principal"
+            value={profile?.turma_principal_id ?? ''}
+            disabled={turmaSalvando}
+            onChange={(e) => salvarTurmaPrincipal(e.target.value)}
+            className="w-full rounded-sm border border-rope-dim/50 bg-ink px-3.5 py-2.5 text-sm text-chalk focus:border-hanko focus:outline-none focus:ring-1 focus:ring-hanko"
           >
-            {fotoEnviando ? 'Enviando…' : 'Adicionar imagem'}
+            <option value="">Nenhuma</option>
+            {turmasQuery.data?.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.nome}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="pt-4">
+          <div className="mb-3 flex items-center justify-between">
+            <Label className="mb-0">Exame médico</Label>
+            <Badge tone={TONE_STATUS_EXAME[statusExame]}>{ROTULO_STATUS_EXAME[statusExame]}</Badge>
           </div>
-          <input
-            id="foto"
-            type="file"
-            accept="image/*"
-            disabled={fotoEnviando}
-            onChange={(e) => e.target.files?.[0] && trocarFoto(e.target.files[0])}
-            className="sr-only"
-          />
-        </label>
-        <div>
-          <Label className="mb-0">Foto de perfil</Label>
-          <p className="mt-1 text-xs text-rope">Clique na foto pra trocar.</p>
-        </div>
-      </Card>
 
-      <Card>
-        <Label htmlFor="turma-principal">Turma principal</Label>
-        <select
-          id="turma-principal"
-          value={profile?.turma_principal_id ?? ''}
-          disabled={turmaSalvando}
-          onChange={(e) => salvarTurmaPrincipal(e.target.value)}
-          className="w-full rounded-sm border border-rope-dim/50 bg-ink px-3.5 py-2.5 text-sm text-chalk focus:border-hanko focus:outline-none focus:ring-1 focus:ring-hanko"
-        >
-          <option value="">Nenhuma</option>
-          {turmasQuery.data?.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.nome}
-            </option>
-          ))}
-        </select>
-      </Card>
+          {exameQuery.data?.status === 'aprovado' && exameQuery.data.validade && (
+            <p className="mb-3 text-sm text-rope">
+              Válido até{' '}
+              <span className="font-medium text-chalk">{formatarData(exameQuery.data.validade)}</span>. Só
+              precisa enviar de novo quando estiver perto de vencer.
+            </p>
+          )}
+          {statusExame === 'pendente' && (
+            <p className="mb-3 text-sm text-rope">
+              Sua submissão está com o professor, aguardando aprovação e definição da validade.
+            </p>
+          )}
 
-      <Card>
-        <div className="mb-3 flex items-center justify-between">
-          <Label className="mb-0">Exame médico</Label>
-          <Badge tone={TONE_STATUS_EXAME[statusExame]}>{ROTULO_STATUS_EXAME[statusExame]}</Badge>
-        </div>
-
-        {exameQuery.data?.status === 'aprovado' && exameQuery.data.validade && (
-          <p className="mb-3 text-sm text-rope">
-            Válido até{' '}
-            <span className="font-medium text-chalk">{formatarData(exameQuery.data.validade)}</span>. Só
-            precisa enviar de novo quando estiver perto de vencer.
-          </p>
-        )}
-        {statusExame === 'pendente' && (
-          <p className="mb-3 text-sm text-rope">
-            Sua submissão está com o professor, aguardando aprovação e definição da validade.
-          </p>
-        )}
-
-        {statusExame !== 'pendente' && statusExame !== 'em-dia' && (
-          <div className="flex flex-col gap-4">
-            <div>
-              <Label htmlFor="exame-arquivo">Atestado médico (PDF, foto ou imagem) *</Label>
-              <input
-                id="exame-arquivo"
-                type="file"
-                accept="application/pdf,image/*"
-                onChange={(e) => setArquivoExame(e.target.files?.[0] ?? null)}
-                className="text-xs text-rope"
-              />
-              {exameQuery.data?.arquivo_url && !arquivoExame && (
-                <p className="mt-1 font-mono text-xs text-mat-light">Atestado enviado ✓</p>
-              )}
+          {statusExame !== 'pendente' && statusExame !== 'em-dia' && (
+            <div className="flex flex-col gap-4">
+              <div>
+                <Label>Atestado médico (PDF, foto ou imagem) *</Label>
+                <div className="flex flex-col gap-2">
+                  <FileButton
+                    accept="application/pdf,image/*"
+                    onSelect={setArquivoExame}
+                    label="Escolher arquivo"
+                    icon={<Paperclip className="h-4 w-4" />}
+                  />
+                  {arquivoExame && <p className="font-mono text-xs text-rope">{arquivoExame.name}</p>}
+                  {exameQuery.data?.arquivo_url && !arquivoExame && (
+                    <p className="font-mono text-xs text-mat-light">Atestado enviado ✓</p>
+                  )}
+                </div>
+              </div>
+              <Button disabled={exameSalvando || !arquivoExame} onClick={salvarExame} className="self-start">
+                {exameSalvando ? 'Enviando…' : 'Enviar para análise'}
+              </Button>
             </div>
-            <Button disabled={exameSalvando || !arquivoExame} onClick={salvarExame} className="self-start">
-              {exameSalvando ? 'Enviando…' : 'Enviar para análise'}
-            </Button>
-          </div>
-        )}
+          )}
+        </div>
       </Card>
 
       <h2 className="font-mono text-xs uppercase tracking-[0.14em] text-rope-dim">Seus dados</h2>
