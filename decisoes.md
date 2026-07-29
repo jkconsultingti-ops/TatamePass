@@ -50,6 +50,10 @@ Antes o aluno digitava um `codigo_convite` manualmente no onboarding. Virou um l
 
 Os dois começaram como enum do Postgres, mas viraram `text` com `check` constraint (primeiro `perfil_campos.tipo`, depois `profiles.role`) pelo mesmo motivo: o Postgres não deixa usar um valor de enum recém-adicionado (`ALTER TYPE ... ADD VALUE`) na mesma transação em que ele foi criado — trava real quando a migração também precisa *usar* o valor novo (ex: promover todo `professor` existente pra `admin` na mesma migração que introduziu `admin`). `text + check` não tem essa restrição e é igual de fácil de validar.
 
+## Formulário de perfil como gate bloqueante no onboarding do aluno
+
+Antes, o formulário configurado pelo admin (`perfil_campos`) só existia como tela de edição em `/aluno/perfil`, com salvar por campo — a academia configurava campos obrigatórios e nunca recebia resposta, porque nada obrigava o aluno a visitar aquela tela. Agora existe `usePerfilCompleto()` (`src/lib/formularios.ts`), que checa se `profiles.nome` e todo campo `obrigatorio` do formulário padrão têm resposta, e uma rota-gate `PerfilCompletoRoute` (`src/auth/ProtectedRoute.tsx`) que envolve as rotas de aluno: enquanto `usePerfilCompleto()` não estiver completo, qualquer navegação para `/aluno/*` redireciona pra `/aluno/completar-perfil` (tela nova, fora do `AlunoLayout` — sem menu, pra não dar pra escapar do gate). Isso também corrige de passagem alunos com `nome` vazio (quem se cadastra por e-mail/telefone, já que `ConviteEntrar.tsx` só pega nome do metadata do Google) — o gate força a pessoa a digitar o nome antes de liberar o dashboard. Professor e admin não são afetados; o gate só embrulha as rotas de aluno.
+
 ## Tailwind v4 com tokens de design customizados
 
 Cores, fontes e nomes semânticos (`hanko`, `mat`, `paper`, `ink`, `rope`, `chalk`) são definidos como CSS custom properties dentro de um bloco `@theme` em `src/index.css`, que o Tailwind v4 transforma automaticamente em utilitários (`bg-hanko`, `text-mat-light` etc). Evita duplicar a paleta em um arquivo de config separado (Tailwind v4 é CSS-first) e mantém os tokens visíveis num único lugar.

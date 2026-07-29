@@ -1,5 +1,11 @@
 import { createBrowserRouter } from 'react-router-dom'
-import { GuestRoute, OnboardingRoute, ProtectedRoute, CatchAllRedirect } from './auth/ProtectedRoute'
+import {
+  GuestRoute,
+  OnboardingRoute,
+  ProtectedRoute,
+  PerfilCompletoRoute,
+  CatchAllRedirect,
+} from './auth/ProtectedRoute'
 import { Login } from './features/onboarding/Login'
 import { ConviteEntrar } from './features/onboarding/ConviteEntrar'
 import { PoliticaPrivacidade } from './features/legal/PoliticaPrivacidade'
@@ -7,6 +13,7 @@ import { Onboarding } from './features/onboarding/Onboarding'
 import { AlunoLayout } from './features/aluno/AlunoLayout'
 import { AlunoDashboard } from './features/aluno/AlunoDashboard'
 import { AlunoPerfil } from './features/aluno/AlunoPerfil'
+import { AlunoCompletarPerfil } from './features/aluno/AlunoCompletarPerfil'
 import { AlunoTurmas } from './features/aluno/AlunoTurmas'
 import { AlunoGraduacao } from './features/aluno/AlunoGraduacao'
 import { ProfessorLayout } from './features/professor/ProfessorLayout'
@@ -34,13 +41,19 @@ export const router = createBrowserRouter([
   {
     element: <ProtectedRoute role="aluno" />,
     children: [
+      { path: '/aluno/completar-perfil', element: <AlunoCompletarPerfil /> },
       {
-        element: <AlunoLayout />,
+        element: <PerfilCompletoRoute />,
         children: [
-          { path: '/aluno', element: <AlunoDashboard /> },
-          { path: '/aluno/perfil', element: <AlunoPerfil /> },
-          { path: '/aluno/turmas', element: <AlunoTurmas /> },
-          { path: '/aluno/graduacao', element: <AlunoGraduacao /> },
+          {
+            element: <AlunoLayout />,
+            children: [
+              { path: '/aluno', element: <AlunoDashboard /> },
+              { path: '/aluno/perfil', element: <AlunoPerfil /> },
+              { path: '/aluno/turmas', element: <AlunoTurmas /> },
+              { path: '/aluno/graduacao', element: <AlunoGraduacao /> },
+            ],
+          },
         ],
       },
     ],

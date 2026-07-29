@@ -3,14 +3,17 @@ import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../auth/AuthProvider'
-import { useFormularios, formularioPadrao, decodeCaixas, encodeCaixas } from '../../lib/formularios'
+import { useFormularios, formularioPadrao } from '../../lib/formularios'
 import { statusExameMedico, ROTULO_STATUS_EXAME, TONE_STATUS_EXAME } from '../../lib/exameMedico'
 import { formatarData } from '../../lib/datas'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
 import { Badge } from '../../components/Badge'
-import { Label, Input, Textarea } from '../../components/Field'
+import { Label, Input } from '../../components/Field'
+import { CampoPerfilInput } from '../../components/CampoPerfilInput'
 import type { PerfilCampo, PerfilResposta, Turma, ExameMedico } from '../../types/database'
+
+const CAMPOS_COM_BOTAO_SALVAR: PerfilCampo['tipo'][] = ['texto_curto', 'texto_longo', 'numero', 'data']
 
 export function AlunoPerfil() {
   const { profile, refreshProfile } = useAuth()
@@ -156,19 +159,6 @@ export function AlunoPerfil() {
     } catch (err) {
       setMensagem(err instanceof Error ? err.message : 'Não foi possível salvar')
     }
-  }
-
-  function salvarEscolha(campo: PerfilCampo, valor: string) {
-    setValores((v) => ({ ...v, [campo.id]: valor }))
-    salvarValorDireto(campo, valor)
-  }
-
-  function alternarCaixa(campo: PerfilCampo, opcao: string, marcado: boolean) {
-    const atuais = decodeCaixas(valores[campo.id])
-    const novas = marcado ? [...atuais, opcao] : atuais.filter((o) => o !== opcao)
-    const codificado = encodeCaixas(novas)
-    setValores((v) => ({ ...v, [campo.id]: codificado }))
-    salvarValorDireto(campo, codificado)
   }
 
   async function enviarDocumento(campo: PerfilCampo, arquivo: File) {
@@ -356,114 +346,40 @@ export function AlunoPerfil() {
         )}
       </Card>
 
-      {camposQuery.data?.map((campo) => (
-        <Card key={campo.id}>
-          <Label htmlFor={campo.id}>
-            {campo.label}
-            {campo.obrigatorio ? ' *' : ''}
-          </Label>
-
-          {(campo.tipo === 'texto_curto' || campo.tipo === 'numero' || campo.tipo === 'data') && (
+      {camposQuery.data?.map((campo) => {
+        const precisaBotaoSalvar = CAMPOS_COM_BOTAO_SALVAR.includes(campo.tipo)
+        return (
+          <Card key={campo.id}>
+            <Label htmlFor={campo.id}>
+              {campo.label}
+              {campo.obrigatorio ? ' *' : ''}
+            </Label>
             <div className="flex flex-col gap-2">
-              <Input
-                id={campo.id}
-                type={campo.tipo === 'numero' ? 'number' : campo.tipo === 'data' ? 'date' : 'text'}
-                value={valores[campo.id] ?? ''}
-                onChange={(e) => setValores((v) => ({ ...v, [campo.id]: e.target.value }))}
-                className="max-w-sm"
+              <CampoPerfilInput
+                campo={campo}
+                valor={valores[campo.id] ?? ''}
+                onChange={(valor) => {
+                  setValores((v) => ({ ...v, [campo.id]: valor }))
+                  if (!precisaBotaoSalvar) salvarValorDireto(campo, valor)
+                }}
+                onArquivo={(arquivo) => enviarDocumento(campo, arquivo)}
+                documentoEnviado={!!documentoExistente(campo.id)}
+                enviandoArquivo={uploadCampo === campo.id}
               />
-              <Button
-                variant="secondary"
-                onClick={() => salvarTexto(campo)}
-                disabled={salvandoCampo === campo.id}
-                className="self-start"
-              >
-                {salvandoCampo === campo.id ? 'Salvando…' : 'Salvar'}
-              </Button>
-            </div>
-          )}
-
-          {campo.tipo === 'texto_longo' && (
-            <div className="flex flex-col gap-2">
-              <Textarea
-                id={campo.id}
-                value={valores[campo.id] ?? ''}
-                onChange={(e) => setValores((v) => ({ ...v, [campo.id]: e.target.value }))}
-              />
-              <Button
-                variant="secondary"
-                onClick={() => salvarTexto(campo)}
-                disabled={salvandoCampo === campo.id}
-                className="self-start"
-              >
-                {salvandoCampo === campo.id ? 'Salvando…' : 'Salvar'}
-              </Button>
-            </div>
-          )}
-
-          {campo.tipo === 'multipla_escolha' && (
-            <div className="flex flex-col gap-2">
-              {(campo.opcoes ?? []).map((opcao) => (
-                <label key={opcao} className="flex items-center gap-2 text-sm text-chalk">
-                  <input
-                    type="radio"
-                    name={campo.id}
-                    checked={valores[campo.id] === opcao}
-                    onChange={() => salvarEscolha(campo, opcao)}
-                  />
-                  {opcao}
-                </label>
-              ))}
-            </div>
-          )}
-
-          {campo.tipo === 'caixa_selecao' && (
-            <div className="flex flex-col gap-2">
-              {(campo.opcoes ?? []).map((opcao) => (
-                <label key={opcao} className="flex items-center gap-2 text-sm text-chalk">
-                  <input
-                    type="checkbox"
-                    checked={decodeCaixas(valores[campo.id]).includes(opcao)}
-                    onChange={(e) => alternarCaixa(campo, opcao, e.target.checked)}
-                  />
-                  {opcao}
-                </label>
-              ))}
-            </div>
-          )}
-
-          {campo.tipo === 'lista_suspensa' && (
-            <select
-              id={campo.id}
-              value={valores[campo.id] ?? ''}
-              onChange={(e) => salvarEscolha(campo, e.target.value)}
-              className="w-full max-w-sm rounded-sm border border-rope-dim/50 bg-ink px-3.5 py-2.5 text-sm text-chalk focus:border-hanko focus:outline-none focus:ring-1 focus:ring-hanko"
-            >
-              <option value="">Selecione</option>
-              {(campo.opcoes ?? []).map((opcao) => (
-                <option key={opcao} value={opcao}>
-                  {opcao}
-                </option>
-              ))}
-            </select>
-          )}
-
-          {campo.tipo === 'documento' && (
-            <div className="flex flex-col gap-2">
-              {documentoExistente(campo.id) && (
-                <p className="font-mono text-xs text-mat-light">Documento enviado ✓</p>
+              {precisaBotaoSalvar && (
+                <Button
+                  variant="secondary"
+                  onClick={() => salvarTexto(campo)}
+                  disabled={salvandoCampo === campo.id}
+                  className="self-start"
+                >
+                  {salvandoCampo === campo.id ? 'Salvando…' : 'Salvar'}
+                </Button>
               )}
-              <input
-                id={campo.id}
-                type="file"
-                disabled={uploadCampo === campo.id}
-                onChange={(e) => e.target.files?.[0] && enviarDocumento(campo, e.target.files[0])}
-                className="text-xs text-rope"
-              />
             </div>
-          )}
-        </Card>
-      ))}
+          </Card>
+        )
+      })}
 
       {mensagem && <p className="font-mono text-xs text-rope">{mensagem}</p>}
 
