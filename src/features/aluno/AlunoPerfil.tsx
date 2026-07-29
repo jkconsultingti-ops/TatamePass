@@ -13,19 +13,21 @@ import { Label, Input } from '../../components/Field'
 import { CampoPerfilInput } from '../../components/CampoPerfilInput'
 import type { PerfilCampo, PerfilResposta, Turma, ExameMedico } from '../../types/database'
 
-const CAMPOS_COM_BOTAO_SALVAR: PerfilCampo['tipo'][] = ['texto_curto', 'texto_longo', 'numero', 'data']
+/** Tipos cujo valor só grava quando o aluno aperta "Salvar alterações" — os
+ * demais (escolha/lista/checkbox) salvam sozinhos ao mudar, e documento sobe
+ * na hora, então não entram nesse buffer. */
+const CAMPOS_COM_SALVAR_EM_LOTE: PerfilCampo['tipo'][] = ['texto_curto', 'texto_longo', 'numero', 'data']
 
 export function AlunoPerfil() {
   const { profile, refreshProfile } = useAuth()
   const queryClient = useQueryClient()
-  const [salvandoCampo, setSalvandoCampo] = useState<string | null>(null)
+  const [salvandoTudo, setSalvandoTudo] = useState(false)
   const [mensagem, setMensagem] = useState<string | null>(null)
   const [valores, setValores] = useState<Record<string, string>>({})
   const [uploadCampo, setUploadCampo] = useState<string | null>(null)
   const [fotoEnviando, setFotoEnviando] = useState(false)
   const [turmaSalvando, setTurmaSalvando] = useState(false)
   const [nome, setNome] = useState(profile?.nome ?? '')
-  const [nomeSalvando, setNomeSalvando] = useState(false)
   const [arquivoExame, setArquivoExame] = useState<File | null>(null)
   const [exameSalvando, setExameSalvando] = useState(false)
 
@@ -94,20 +96,6 @@ export function AlunoPerfil() {
     setValores(mapa)
   }, [respostasQuery.data])
 
-  async function salvarNome() {
-    if (!profile || !nome.trim() || nome.trim() === profile.nome) return
-    setNomeSalvando(true)
-    try {
-      const { error } = await supabase.from('profiles').update({ nome: nome.trim() }).eq('id', profile.id)
-      if (error) throw error
-      await refreshProfile()
-    } catch (err) {
-      setMensagem(err instanceof Error ? err.message : 'Não foi possível salvar o nome')
-    } finally {
-      setNomeSalvando(false)
-    }
-  }
-
   async function salvarTurmaPrincipal(turmaId: string) {
     if (!profile) return
     setTurmaSalvando(true)
@@ -125,23 +113,36 @@ export function AlunoPerfil() {
     }
   }
 
-  async function salvarTexto(campo: PerfilCampo) {
+  async function salvarTudo() {
     if (!profile) return
-    setSalvandoCampo(campo.id)
+    setSalvandoTudo(true)
     setMensagem(null)
     try {
-      const { error } = await supabase
-        .from('perfil_respostas')
-        .upsert(
-          { aluno_id: profile.id, campo_id: campo.id, valor_texto: valores[campo.id] ?? '' },
+      if (nome.trim() && nome.trim() !== profile.nome) {
+        const { error } = await supabase.from('profiles').update({ nome: nome.trim() }).eq('id', profile.id)
+        if (error) throw error
+        await refreshProfile()
+      }
+
+      const camposEmLote = (camposQuery.data ?? []).filter((c) => CAMPOS_COM_SALVAR_EM_LOTE.includes(c.tipo))
+      if (camposEmLote.length > 0) {
+        const { error } = await supabase.from('perfil_respostas').upsert(
+          camposEmLote.map((campo) => ({
+            aluno_id: profile.id,
+            campo_id: campo.id,
+            valor_texto: valores[campo.id] ?? '',
+          })),
           { onConflict: 'aluno_id,campo_id' },
         )
-      if (error) throw error
+        if (error) throw error
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ['perfil_respostas', profile.id] })
       setMensagem('Salvo.')
     } catch (err) {
       setMensagem(err instanceof Error ? err.message : 'Não foi possível salvar')
     } finally {
-      setSalvandoCampo(null)
+      setSalvandoTudo(false)
     }
   }
 
@@ -277,17 +278,6 @@ export function AlunoPerfil() {
       </Card>
 
       <Card>
-        <Label htmlFor="nome-completo">Nome completo</Label>
-        <Input
-          id="nome-completo"
-          value={nome}
-          disabled={nomeSalvando}
-          onChange={(e) => setNome(e.target.value)}
-          onBlur={salvarNome}
-        />
-      </Card>
-
-      <Card>
         <Label htmlFor="turma-principal">Turma principal</Label>
         <select
           id="turma-principal"
@@ -346,40 +336,39 @@ export function AlunoPerfil() {
         )}
       </Card>
 
+      <h2 className="font-mono text-xs uppercase tracking-[0.14em] text-rope-dim">Seus dados</h2>
+
+      <Card>
+        <Label htmlFor="nome-completo">Nome completo</Label>
+        <Input id="nome-completo" value={nome} onChange={(e) => setNome(e.target.value)} />
+      </Card>
+
       {camposQuery.data?.map((campo) => {
-        const precisaBotaoSalvar = CAMPOS_COM_BOTAO_SALVAR.includes(campo.tipo)
+        const salvaEmLote = CAMPOS_COM_SALVAR_EM_LOTE.includes(campo.tipo)
         return (
           <Card key={campo.id}>
             <Label htmlFor={campo.id}>
               {campo.label}
               {campo.obrigatorio ? ' *' : ''}
             </Label>
-            <div className="flex flex-col gap-2">
-              <CampoPerfilInput
-                campo={campo}
-                valor={valores[campo.id] ?? ''}
-                onChange={(valor) => {
-                  setValores((v) => ({ ...v, [campo.id]: valor }))
-                  if (!precisaBotaoSalvar) salvarValorDireto(campo, valor)
-                }}
-                onArquivo={(arquivo) => enviarDocumento(campo, arquivo)}
-                documentoEnviado={!!documentoExistente(campo.id)}
-                enviandoArquivo={uploadCampo === campo.id}
-              />
-              {precisaBotaoSalvar && (
-                <Button
-                  variant="secondary"
-                  onClick={() => salvarTexto(campo)}
-                  disabled={salvandoCampo === campo.id}
-                  className="self-start"
-                >
-                  {salvandoCampo === campo.id ? 'Salvando…' : 'Salvar'}
-                </Button>
-              )}
-            </div>
+            <CampoPerfilInput
+              campo={campo}
+              valor={valores[campo.id] ?? ''}
+              onChange={(valor) => {
+                setValores((v) => ({ ...v, [campo.id]: valor }))
+                if (!salvaEmLote) salvarValorDireto(campo, valor)
+              }}
+              onArquivo={(arquivo) => enviarDocumento(campo, arquivo)}
+              documentoEnviado={!!documentoExistente(campo.id)}
+              enviandoArquivo={uploadCampo === campo.id}
+            />
           </Card>
         )
       })}
+
+      <Button onClick={salvarTudo} disabled={salvandoTudo} className="self-start">
+        {salvandoTudo ? 'Salvando…' : 'Salvar alterações'}
+      </Button>
 
       {mensagem && <p className="font-mono text-xs text-rope">{mensagem}</p>}
 
