@@ -193,7 +193,8 @@ export function AlunoPerfil() {
     setFotoEnviando(true)
     setMensagem(null)
     try {
-      const caminho = `${profile.academia_id}/${profile.id}`
+      const extensao = arquivo.name.split('.').pop() ?? 'jpg'
+      const caminho = `${profile.academia_id}/${profile.id}/avatar.${extensao}`
       const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(caminho, arquivo, { upsert: true })
@@ -259,21 +260,34 @@ export function AlunoPerfil() {
       <h1 className="font-display text-2xl font-semibold text-chalk">Meu perfil</h1>
 
       <Card className="flex items-center gap-4">
-        {profile?.foto_url ? (
-          <img src={profile.foto_url} alt="" className="h-16 w-16 rounded-full object-cover" />
-        ) : (
-          <div className="h-16 w-16 rounded-full bg-ink" />
-        )}
-        <div>
-          <Label htmlFor="foto">Foto de perfil</Label>
+        <label
+          htmlFor="foto"
+          className={`group relative block h-16 w-16 shrink-0 overflow-hidden rounded-full ${fotoEnviando ? 'cursor-wait' : 'cursor-pointer'}`}
+        >
+          {profile?.foto_url ? (
+            <img src={profile.foto_url} alt="" className="h-16 w-16 rounded-full object-cover" />
+          ) : (
+            <div className="h-16 w-16 rounded-full bg-ink" />
+          )}
+          <div
+            className={`absolute inset-0 flex items-center justify-center rounded-full bg-ink/70 px-1 text-center font-mono text-[9px] uppercase leading-tight tracking-wide text-chalk backdrop-blur-sm transition-opacity ${
+              fotoEnviando ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+            }`}
+          >
+            {fotoEnviando ? 'Enviando…' : 'Adicionar imagem'}
+          </div>
           <input
             id="foto"
             type="file"
             accept="image/*"
             disabled={fotoEnviando}
             onChange={(e) => e.target.files?.[0] && trocarFoto(e.target.files[0])}
-            className="text-xs text-rope"
+            className="sr-only"
           />
+        </label>
+        <div>
+          <Label className="mb-0">Foto de perfil</Label>
+          <p className="mt-1 text-xs text-rope">Clique na foto pra trocar.</p>
         </div>
       </Card>
 
