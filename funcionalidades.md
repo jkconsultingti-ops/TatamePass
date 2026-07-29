@@ -37,6 +37,7 @@ SaaS multi-tenant de gestão de presença para academias de luta. Cada academia 
 - [x] Criação do formulário de perfil do aluno (campos de texto/documento/múltipla escolha, obrigatoriedade, ordem)
 - [x] Links de convite (aluno e professor) prontos pra compartilhar
 - [x] Cadastro/promoção de professores (promover a admin, rebaixar a professor)
+- [x] Personalização de marca: cor de destaque e logo, aplicados no app pra quem é da academia
 
 ### Notificações — fora desta entrega
 

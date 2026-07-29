@@ -9,6 +9,7 @@ const nav = [
   { to: '/admin/professores', label: 'Professores' },
   { to: '/admin/graduacao', label: 'Graduação' },
   { to: '/admin/perfil-form', label: 'Formulário' },
+  { to: '/admin/marca', label: 'Marca' },
 ]
 
 export function AdminLayout() {

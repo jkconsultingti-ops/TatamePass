@@ -9,15 +9,21 @@ interface AppShellProps {
 }
 
 export function AppShell({ children, nav }: AppShellProps) {
-  const { profile, signOut } = useAuth()
+  const { profile, academia, signOut } = useAuth()
 
   return (
     <div className="min-h-svh bg-ink text-chalk">
       <header className="border-b border-rope-dim/20">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-2 text-hanko">
-            <Stamp className="h-8 w-8" />
-            <span className="font-display text-lg font-semibold text-chalk">TatamePass</span>
+            {academia?.logo_url ? (
+              <img src={academia.logo_url} alt="" className="h-8 w-8 rounded-full object-cover" />
+            ) : (
+              <Stamp className="h-8 w-8" />
+            )}
+            <span className="font-display text-lg font-semibold text-chalk">
+              {academia?.nome ?? 'TatamePass'}
+            </span>
           </div>
           <nav className="flex items-center gap-1 overflow-x-auto">
             {nav.map((item) => (

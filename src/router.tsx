@@ -27,6 +27,7 @@ import { AdminDashboard } from './features/admin/AdminDashboard'
 import { AdminTurmas } from './features/admin/AdminTurmas'
 import { AdminProfessores } from './features/admin/AdminProfessores'
 import { AdminPerfilForm } from './features/admin/AdminPerfilForm'
+import { AdminMarca } from './features/admin/AdminMarca'
 
 export const router = createBrowserRouter([
   {
@@ -87,6 +88,7 @@ export const router = createBrowserRouter([
           { path: '/admin/professores', element: <AdminProfessores /> },
           { path: '/admin/graduacao', element: <ProfessorGraduacao /> },
           { path: '/admin/perfil-form', element: <AdminPerfilForm /> },
+          { path: '/admin/marca', element: <AdminMarca /> },
         ],
       },
     ],

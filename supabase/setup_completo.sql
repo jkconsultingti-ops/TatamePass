@@ -31,6 +31,8 @@ create table academias (
   nome text not null,
   codigo_convite text not null unique,
   codigo_convite_professor text not null unique,
+  cor_marca text,
+  logo_url text,
   criado_em timestamptz not null default now()
 );
 
@@ -371,8 +373,13 @@ alter table exames_medicos enable row level security;
 alter table aulas_canceladas enable row level security;
 
 -- academias: só membros leem a própria; criação é só via create_academia().
+-- Update é só admin, hoje usado pra cor_marca/logo_url (personalização).
 create policy "academias_select_propria" on academias
   for select using (id = auth_academia_id());
+
+create policy "academias_update_admin" on academias
+  for update using (id = auth_academia_id() and auth_role() = 'admin')
+  with check (id = auth_academia_id() and auth_role() = 'admin');
 
 -- profiles: leitura de todos os perfis da mesma academia. Cada um atualiza
 -- o próprio (nome/foto/turma principal); admin pode atualizar qualquer
@@ -548,4 +555,28 @@ create policy "documentos_dono_insere" on storage.objects
 create policy "documentos_dono_atualiza" on storage.objects
   for update to authenticated using (
     bucket_id = 'documentos' and (storage.foldername(name))[2] = auth.uid()::text
+  );
+
+-- Logo da academia: path {academia_id}/logo.ext, só admin escreve, leitura
+-- pública (aparece no header do app pra todo mundo da academia).
+
+insert into storage.buckets (id, name, public)
+values ('academia-branding', 'academia-branding', true)
+on conflict (id) do nothing;
+
+create policy "academia_branding_leitura_publica" on storage.objects
+  for select using (bucket_id = 'academia-branding');
+
+create policy "academia_branding_admin_insere" on storage.objects
+  for insert to authenticated with check (
+    bucket_id = 'academia-branding'
+    and (storage.foldername(name))[1] = auth_academia_id()::text
+    and auth_role() = 'admin'
+  );
+
+create policy "academia_branding_admin_atualiza" on storage.objects
+  for update to authenticated using (
+    bucket_id = 'academia-branding'
+    and (storage.foldername(name))[1] = auth_academia_id()::text
+    and auth_role() = 'admin'
   );

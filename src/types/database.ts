@@ -14,6 +14,8 @@ export type Academia = {
   nome: string
   codigo_convite: string
   codigo_convite_professor: string
+  cor_marca: string | null
+  logo_url: string | null
   criado_em: string
 }
 
