@@ -21,6 +21,12 @@
   --color-mat-light: #2e8b74;
   --color-rope: #c7a97b;
   --color-rope-dim: #a68d63;
+
+  /* Só usado no widget de calendário "papel" (ProfessorAgenda) — esse cartão
+     é sempre claro-com-texto-escuro de propósito, então precisa de um tom
+     de tinta que NÃO troca com o tema (--color-ink troca, --color-ink-fixed
+     não). */
+  --color-ink-fixed: #14171f;
 }
 
 :root {
@@ -30,6 +36,18 @@
   color: var(--color-chalk);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Tema claro por academia (ver aplicarTema em src/lib/branding.ts) — troca
+   só fundo/texto/borda; a cor de destaque (hanko) é escolhida à parte pela
+   academia e funciona nos dois temas. */
+:root[data-theme='claro'] {
+  color-scheme: light;
+  --color-ink: #f5f1e8;
+  --color-ink-soft: #fffdf8;
+  --color-chalk: #14171f;
+  --color-rope: #6b5636;
+  --color-rope-dim: #8f7a54;
 }
 
 * {

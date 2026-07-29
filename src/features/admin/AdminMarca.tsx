@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Image as ImageIcon } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../auth/AuthProvider'
+import { aplicarCorMarca, aplicarTema, extrairCorDominante, type Tema } from '../../lib/branding'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
 import { Label } from '../../components/Field'
@@ -12,7 +13,9 @@ const COR_PADRAO = '#c1391f'
 export function AdminMarca() {
   const { profile, academia, refreshAcademia } = useAuth()
   const [cor, setCor] = useState(academia?.cor_marca ?? COR_PADRAO)
+  const [corSugerida, setCorSugerida] = useState(false)
   const [logoUrl, setLogoUrl] = useState(academia?.logo_url ?? null)
+  const [tema, setTema] = useState<Tema>(academia?.tema ?? 'escuro')
   const [enviandoLogo, setEnviandoLogo] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const [mensagem, setMensagem] = useState<string | null>(null)
@@ -21,22 +24,44 @@ export function AdminMarca() {
   useEffect(() => {
     setCor(academia?.cor_marca ?? COR_PADRAO)
     setLogoUrl(academia?.logo_url ?? null)
-  }, [academia?.cor_marca, academia?.logo_url])
+    setTema(academia?.tema ?? 'escuro')
+  }, [academia?.cor_marca, academia?.logo_url, academia?.tema])
+
+  // Prévia ao vivo: mexe nas mesmas variáveis que o AuthProvider aplica a
+  // partir do que está salvo — ao sair da tela sem salvar, o próximo reload
+  // volta pro valor salvo, então não há risco de "vazar" a prévia.
+  useEffect(() => {
+    aplicarCorMarca(cor)
+    return () => aplicarCorMarca(academia?.cor_marca)
+  }, [cor, academia?.cor_marca])
+
+  useEffect(() => {
+    aplicarTema(tema)
+    return () => aplicarTema(academia?.tema)
+  }, [tema, academia?.tema])
 
   async function enviarLogo(arquivo: File) {
     if (!profile) return
     setEnviandoLogo(true)
     setErro(null)
     try {
-      const extensao = arquivo.name.split('.').pop() ?? 'png'
-      const caminho = `${profile.academia_id}/logo.${extensao}`
-      const { error: uploadError } = await supabase.storage
-        .from('academia-branding')
-        .upload(caminho, arquivo, { upsert: true })
-      if (uploadError) throw uploadError
-
-      const { data } = supabase.storage.from('academia-branding').getPublicUrl(caminho)
-      setLogoUrl(`${data.publicUrl}?v=${Date.now()}`)
+      const [corDaLogo] = await Promise.all([
+        extrairCorDominante(arquivo),
+        (async () => {
+          const extensao = arquivo.name.split('.').pop() ?? 'png'
+          const caminho = `${profile.academia_id}/logo.${extensao}`
+          const { error: uploadError } = await supabase.storage
+            .from('academia-branding')
+            .upload(caminho, arquivo, { upsert: true })
+          if (uploadError) throw uploadError
+          const { data } = supabase.storage.from('academia-branding').getPublicUrl(caminho)
+          setLogoUrl(`${data.publicUrl}?v=${Date.now()}`)
+        })(),
+      ])
+      if (corDaLogo) {
+        setCor(corDaLogo)
+        setCorSugerida(true)
+      }
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Não foi possível enviar o logo')
     } finally {
@@ -52,7 +77,7 @@ export function AdminMarca() {
     try {
       const { error } = await supabase
         .from('academias')
-        .update({ cor_marca: cor, logo_url: logoUrl })
+        .update({ cor_marca: cor, logo_url: logoUrl, tema })
         .eq('id', profile.academia_id)
       if (error) throw error
       await refreshAcademia()
@@ -69,8 +94,7 @@ export function AdminMarca() {
       <div>
         <h1 className="font-display text-2xl font-semibold text-chalk">Marca</h1>
         <p className="mt-1 text-sm text-rope">
-          A cor e o logo aqui aparecem pra todo mundo da academia dentro do app — no cabeçalho e nos
-          botões de destaque.
+          A cor, o logo e o tema aqui aparecem pra todo mundo da academia dentro do app.
         </p>
       </div>
 
@@ -93,17 +117,43 @@ export function AdminMarca() {
           </div>
         </div>
 
-        <div className="pt-4">
+        <div className="py-4">
           <Label htmlFor="cor-marca">Cor de destaque</Label>
           <div className="flex items-center gap-3">
             <input
               id="cor-marca"
               type="color"
               value={cor}
-              onChange={(e) => setCor(e.target.value)}
+              onChange={(e) => {
+                setCor(e.target.value)
+                setCorSugerida(false)
+              }}
               className="h-10 w-14 cursor-pointer rounded-sm border border-rope-dim/50 bg-ink p-1"
             />
             <span className="font-mono text-sm text-rope">{cor}</span>
+          </div>
+          {corSugerida && (
+            <p className="mt-1.5 font-mono text-[11px] text-rope-dim">
+              Sugestão a partir da logo — ajuste se quiser.
+            </p>
+          )}
+        </div>
+
+        <div className="pt-4">
+          <Label>Tema</Label>
+          <div className="flex w-fit gap-1 rounded-sm border border-rope-dim/40 p-1">
+            {(['escuro', 'claro'] as const).map((opcao) => (
+              <button
+                key={opcao}
+                type="button"
+                onClick={() => setTema(opcao)}
+                className={`rounded-sm px-4 py-2 font-mono text-xs uppercase tracking-wide transition-colors ${
+                  tema === opcao ? 'bg-hanko/15 text-hanko' : 'text-rope hover:text-chalk'
+                }`}
+              >
+                {opcao}
+              </button>
+            ))}
           </div>
         </div>
       </Card>

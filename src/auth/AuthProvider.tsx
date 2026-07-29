@@ -8,7 +8,7 @@ import {
 } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
-import { aplicarCorMarca } from '../lib/branding'
+import { aplicarCorMarca, aplicarTema } from '../lib/branding'
 import type { Academia, Profile } from '../types/database'
 
 interface AuthContextValue {
@@ -53,6 +53,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     aplicarCorMarca(academia?.cor_marca)
   }, [academia?.cor_marca])
+
+  useEffect(() => {
+    aplicarTema(academia?.tema)
+  }, [academia?.tema])
 
   useEffect(() => {
     let active = true

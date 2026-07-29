@@ -33,6 +33,7 @@ create table academias (
   codigo_convite_professor text not null unique,
   cor_marca text,
   logo_url text,
+  tema text not null default 'escuro' check (tema in ('escuro', 'claro')),
   criado_em timestamptz not null default now()
 );
 

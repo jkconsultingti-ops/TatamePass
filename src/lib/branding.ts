@@ -25,3 +25,82 @@ export function aplicarCorMarca(cor: string | null | undefined) {
     root.removeProperty('--color-hanko-dark')
   }
 }
+
+export type Tema = 'escuro' | 'claro'
+
+/** Troca o conjunto de variáveis de fundo/texto pro tema escolhido (ver
+ * :root[data-theme='claro'] em index.css) — 'escuro' é o padrão, então só
+ * precisa setar o atributo quando for 'claro'. */
+export function aplicarTema(tema: Tema | null | undefined) {
+  if (tema === 'claro') {
+    document.documentElement.dataset.theme = 'claro'
+  } else {
+    delete document.documentElement.dataset.theme
+  }
+}
+
+function rgbParaHex(r: number, g: number, b: number): string {
+  const canal = (v: number) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')
+  return `#${canal(r)}${canal(g)}${canal(b)}`
+}
+
+/** Lê os pixels da imagem (canvas, só no cliente) e devolve a cor mais
+ * vibrante e frequente — ignora quase-branco/quase-preto/cinza (fundo ou
+ * traço do logo, não "a cor" da marca). Serve só de sugestão pro admin
+ * ajustar, não é uma extração de paleta precisa. */
+export function extrairCorDominante(arquivo: File): Promise<string | null> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    const url = URL.createObjectURL(arquivo)
+
+    const limpar = () => URL.revokeObjectURL(url)
+
+    img.onload = () => {
+      try {
+        const tamanho = 48
+        const canvas = document.createElement('canvas')
+        canvas.width = tamanho
+        canvas.height = tamanho
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return resolve(null)
+
+        ctx.drawImage(img, 0, 0, tamanho, tamanho)
+        const { data } = ctx.getImageData(0, 0, tamanho, tamanho)
+
+        const baldes = new Map<string, { count: number; r: number; g: number; b: number }>()
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i]
+          const g = data[i + 1]
+          const b = data[i + 2]
+          const a = data[i + 3]
+          if (a < 200) continue
+
+          const max = Math.max(r, g, b)
+          const min = Math.min(r, g, b)
+          const valor = max / 255
+          const saturacao = max === 0 ? 0 : (max - min) / max
+          if (valor > 0.95 || valor < 0.12 || saturacao < 0.2) continue
+
+          const chave = `${Math.round(r / 16)}-${Math.round(g / 16)}-${Math.round(b / 16)}`
+          const atual = baldes.get(chave)
+          if (atual) atual.count++
+          else baldes.set(chave, { count: 1, r, g, b })
+        }
+
+        let melhor: { count: number; r: number; g: number; b: number } | null = null
+        for (const balde of baldes.values()) {
+          if (!melhor || balde.count > melhor.count) melhor = balde
+        }
+
+        resolve(melhor ? rgbParaHex(melhor.r, melhor.g, melhor.b) : null)
+      } finally {
+        limpar()
+      }
+    }
+    img.onerror = () => {
+      limpar()
+      resolve(null)
+    }
+    img.src = url
+  })
+}

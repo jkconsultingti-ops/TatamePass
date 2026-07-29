@@ -97,7 +97,7 @@ export function ProfessorAgenda() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Stamp className="h-8 w-8 text-hanko" />
-              <p className="font-display text-2xl capitalize text-ink">
+              <p className="font-display text-2xl capitalize text-ink-fixed">
                 {format(mesAtual, 'MMMM yyyy', { locale: ptBR })}
               </p>
             </div>
@@ -117,7 +117,7 @@ export function ProfessorAgenda() {
               <button
                 type="button"
                 onClick={() => setMesAtual((m) => subMonths(m, 1))}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 hover:bg-black/5 hover:text-ink"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 hover:bg-black/5 hover:text-ink-fixed"
                 aria-label="Mês anterior"
               >
                 ‹
@@ -125,7 +125,7 @@ export function ProfessorAgenda() {
               <button
                 type="button"
                 onClick={() => setMesAtual((m) => addMonths(m, 1))}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 hover:bg-black/5 hover:text-ink"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 hover:bg-black/5 hover:text-ink-fixed"
                 aria-label="Próximo mês"
               >
                 ›
@@ -170,7 +170,7 @@ export function ProfessorAgenda() {
           <p className="font-mono text-[11px] uppercase tracking-wide text-neutral-400">
             {format(diaSelecionado, 'EEEE', { locale: ptBR })}
           </p>
-          <p className="mt-1 font-display text-xl text-ink">
+          <p className="mt-1 font-display text-xl text-ink-fixed">
             {format(diaSelecionado, "d 'de' MMMM", { locale: ptBR })}
           </p>
 
@@ -219,7 +219,7 @@ function TurmaDoDia({
     <div className="rounded-xl border border-black/5 bg-white/60 p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-ink">{turma.nome}</p>
+          <p className="text-sm font-medium text-ink-fixed">{turma.nome}</p>
           <p className="mt-0.5 font-mono text-xs text-neutral-500">
             {turma.horario_inicio.slice(0, 5)}–{turma.horario_fim.slice(0, 5)}
           </p>
@@ -254,7 +254,7 @@ function TurmaDoDia({
         <input
           autoFocus
           placeholder="Motivo (ex: feriado)"
-          className="mt-3 w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-ink placeholder:text-neutral-400 focus:border-hanko focus:outline-none"
+          className="mt-3 w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-ink-fixed placeholder:text-neutral-400 focus:border-hanko focus:outline-none"
           onBlur={(e) => {
             if (e.target.value.trim()) onCancelar(e.target.value)
             setCancelando(false)
