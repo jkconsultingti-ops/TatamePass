@@ -1,11 +1,5 @@
 import { createBrowserRouter } from 'react-router-dom'
-import {
-  GuestRoute,
-  OnboardingRoute,
-  ProtectedRoute,
-  PerfilCompletoRoute,
-  CatchAllRedirect,
-} from './auth/ProtectedRoute'
+import { GuestRoute, OnboardingRoute, ProtectedRoute, CatchAllRedirect } from './auth/ProtectedRoute'
 import { Login } from './features/onboarding/Login'
 import { ConviteEntrar } from './features/onboarding/ConviteEntrar'
 import { PoliticaPrivacidade } from './features/legal/PoliticaPrivacidade'
@@ -44,17 +38,12 @@ export const router = createBrowserRouter([
     children: [
       { path: '/aluno/completar-perfil', element: <AlunoCompletarPerfil /> },
       {
-        element: <PerfilCompletoRoute />,
+        element: <AlunoLayout />,
         children: [
-          {
-            element: <AlunoLayout />,
-            children: [
-              { path: '/aluno', element: <AlunoDashboard /> },
-              { path: '/aluno/perfil', element: <AlunoPerfil /> },
-              { path: '/aluno/turmas', element: <AlunoTurmas /> },
-              { path: '/aluno/graduacao', element: <AlunoGraduacao /> },
-            ],
-          },
+          { path: '/aluno', element: <AlunoDashboard /> },
+          { path: '/aluno/perfil', element: <AlunoPerfil /> },
+          { path: '/aluno/turmas', element: <AlunoTurmas /> },
+          { path: '/aluno/graduacao', element: <AlunoGraduacao /> },
         ],
       },
     ],
