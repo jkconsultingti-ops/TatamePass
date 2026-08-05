@@ -46,6 +46,9 @@ create table profiles (
   turma_principal_id uuid,
   identificador_tipo identificador_tipo,
   identificador_valor text,
+  associado_desde date,
+  inicio_jiu_jitsu date,
+  revisado_pelo_professor boolean not null default true,
   criado_em timestamptz not null default now()
 );
 
@@ -221,6 +224,40 @@ create trigger profiles_no_privilege_escalation
   before update on profiles
   for each row execute function prevent_profile_privilege_escalation();
 
+-- Turma principal e data de associação passam a ser definidas só por
+-- professor/admin, não pelo aluno — trava por coluna (não a linha inteira,
+-- que já tem policy própria de update do dono), mesmo padrão acima.
+
+create or replace function prevent_aluno_editar_associado_desde()
+returns trigger
+language plpgsql as $$
+begin
+  if new.associado_desde is distinct from old.associado_desde and auth_role() not in ('professor', 'admin') then
+    raise exception 'só professor ou admin pode alterar a data de associação';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger profiles_travar_associado_desde
+  before update on profiles
+  for each row execute function prevent_aluno_editar_associado_desde();
+
+create or replace function prevent_aluno_editar_turma_principal()
+returns trigger
+language plpgsql as $$
+begin
+  if new.turma_principal_id is distinct from old.turma_principal_id and auth_role() not in ('professor', 'admin') then
+    raise exception 'só professor ou admin pode alterar a turma principal';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger profiles_travar_turma_principal
+  before update on profiles
+  for each row execute function prevent_aluno_editar_turma_principal();
+
 create or replace function set_atualizado_em()
 returns trigger
 language plpgsql as $$
@@ -359,6 +396,33 @@ $$;
 
 grant execute on function resolve_convite(text) to anon, authenticated;
 
+-- Exclusão de conta do aluno (LGPD), só pra admin da própria academia.
+-- security definer: roda com o privilégio do dono da função, que já tem
+-- acesso de escrita em auth.users — não precisa de Admin API/service role
+-- separada por fora do banco. A validação interna (só admin, só aluno da
+-- própria academia) é a barreira de segurança real, já que a função ignora
+-- RLS.
+create function excluir_aluno(p_aluno_id uuid)
+returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if auth_role() <> 'admin' then
+    raise exception 'só um administrador pode excluir a conta de um aluno';
+  end if;
+
+  if not exists (
+    select 1 from profiles
+    where id = p_aluno_id and role = 'aluno' and academia_id = auth_academia_id()
+  ) then
+    raise exception 'aluno não encontrado na sua academia';
+  end if;
+
+  delete from auth.users where id = p_aluno_id;
+end;
+$$;
+
+grant execute on function excluir_aluno(uuid) to authenticated;
+
 -- ── Row Level Security ───────────────────────────────────────────────────
 
 alter table academias enable row level security;
@@ -397,6 +461,13 @@ create policy "profiles_update_proprio" on profiles
 create policy "profiles_update_admin" on profiles
   for update using (academia_id = auth_academia_id() and auth_role() = 'admin')
   with check (academia_id = auth_academia_id() and auth_role() = 'admin');
+
+-- Professor comum também precisa dar update em profiles no dia a dia (turma
+-- principal/data de associação/revisão de cadastro) — sem isso só admin e o
+-- próprio dono conseguiam.
+create policy "profiles_update_staff" on profiles
+  for update using (academia_id = auth_academia_id() and auth_role() in ('professor', 'admin'))
+  with check (academia_id = auth_academia_id() and auth_role() in ('professor', 'admin'));
 
 -- turmas: leitura por qualquer membro da academia; escrita só por admin
 -- (professor só visualiza).
@@ -556,6 +627,23 @@ create policy "documentos_dono_insere" on storage.objects
 create policy "documentos_dono_atualiza" on storage.objects
   for update to authenticated using (
     bucket_id = 'documentos' and (storage.foldername(name))[2] = auth.uid()::text
+  );
+
+-- Exclusão de conta do aluno (LGPD) precisa limpar avatar/documentos antes
+-- de apagar a conta — dono ou admin da própria academia.
+
+create policy "avatars_dono_ou_admin_apaga" on storage.objects
+  for delete to authenticated using (
+    bucket_id = 'avatars'
+    and (storage.foldername(name))[1] = auth_academia_id()::text
+    and ((storage.foldername(name))[2] = auth.uid()::text or auth_role() = 'admin')
+  );
+
+create policy "documentos_dono_ou_admin_apaga" on storage.objects
+  for delete to authenticated using (
+    bucket_id = 'documentos'
+    and (storage.foldername(name))[1] = auth_academia_id()::text
+    and ((storage.foldername(name))[2] = auth.uid()::text or auth_role() = 'admin')
   );
 
 -- Logo da academia: path {academia_id}/logo.ext, só admin escreve, leitura

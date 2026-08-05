@@ -28,12 +28,13 @@ export function AlunoPerfil() {
   const [valores, setValores] = useState<Record<string, string>>({})
   const [uploadCampo, setUploadCampo] = useState<string | null>(null)
   const [fotoEnviando, setFotoEnviando] = useState(false)
-  const [turmaSalvando, setTurmaSalvando] = useState(false)
   const [nome, setNome] = useState(profile?.nome ?? '')
+  const [inicioJiuJitsu, setInicioJiuJitsu] = useState(profile?.inicio_jiu_jitsu ?? '')
   const [arquivoExame, setArquivoExame] = useState<File | null>(null)
   const [exameSalvando, setExameSalvando] = useState(false)
 
   useEffect(() => setNome(profile?.nome ?? ''), [profile?.nome])
+  useEffect(() => setInicioJiuJitsu(profile?.inicio_jiu_jitsu ?? ''), [profile?.inicio_jiu_jitsu])
 
   const formulariosQuery = useFormularios(profile?.academia_id)
   const formulario = formularioPadrao(formulariosQuery.data)
@@ -98,30 +99,18 @@ export function AlunoPerfil() {
     setValores(mapa)
   }, [respostasQuery.data])
 
-  async function salvarTurmaPrincipal(turmaId: string) {
-    if (!profile) return
-    setTurmaSalvando(true)
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ turma_principal_id: turmaId || null })
-        .eq('id', profile.id)
-      if (error) throw error
-      await refreshProfile()
-    } catch (err) {
-      setMensagem(err instanceof Error ? err.message : 'Não foi possível salvar a turma principal')
-    } finally {
-      setTurmaSalvando(false)
-    }
-  }
-
   async function salvarTudo() {
     if (!profile) return
     setSalvandoTudo(true)
     setMensagem(null)
     try {
-      if (nome.trim() && nome.trim() !== profile.nome) {
-        const { error } = await supabase.from('profiles').update({ nome: nome.trim() }).eq('id', profile.id)
+      const patchPerfil: { nome?: string; inicio_jiu_jitsu?: string | null } = {}
+      if (nome.trim() && nome.trim() !== profile.nome) patchPerfil.nome = nome.trim()
+      if (inicioJiuJitsu !== (profile.inicio_jiu_jitsu ?? '')) {
+        patchPerfil.inicio_jiu_jitsu = inicioJiuJitsu || null
+      }
+      if (Object.keys(patchPerfil).length > 0) {
+        const { error } = await supabase.from('profiles').update(patchPerfil).eq('id', profile.id)
         if (error) throw error
         await refreshProfile()
       }
@@ -280,22 +269,19 @@ export function AlunoPerfil() {
           </div>
         </div>
 
-        <div className="py-4">
-          <Label htmlFor="turma-principal">Turma principal</Label>
-          <select
-            id="turma-principal"
-            value={profile?.turma_principal_id ?? ''}
-            disabled={turmaSalvando}
-            onChange={(e) => salvarTurmaPrincipal(e.target.value)}
-            className="w-full rounded-sm border border-rope-dim/50 bg-ink px-3.5 py-2.5 text-sm text-chalk focus:border-hanko focus:outline-none focus:ring-1 focus:ring-hanko"
-          >
-            <option value="">Nenhuma</option>
-            {turmasQuery.data?.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.nome}
-              </option>
-            ))}
-          </select>
+        <div className="flex flex-wrap gap-6 py-4">
+          <div>
+            <Label className="mb-0.5">Turma principal</Label>
+            <p className="text-sm text-chalk">
+              {turmasQuery.data?.find((t) => t.id === profile?.turma_principal_id)?.nome ?? 'Nenhuma'}
+            </p>
+            <p className="font-mono text-[11px] text-rope-dim">Definido pelo professor</p>
+          </div>
+          <div>
+            <Label className="mb-0.5">Associado desde</Label>
+            <p className="text-sm text-chalk">{formatarData(profile?.associado_desde)}</p>
+            <p className="font-mono text-[11px] text-rope-dim">Definido pelo professor</p>
+          </div>
         </div>
 
         <div className="pt-4">
@@ -348,6 +334,19 @@ export function AlunoPerfil() {
         <div className="pb-4">
           <Label htmlFor="nome-completo">Nome completo</Label>
           <Input id="nome-completo" value={nome} onChange={(e) => setNome(e.target.value)} />
+        </div>
+
+        <div className="py-4">
+          <Label htmlFor="inicio-jiu-jitsu">Início no Jiu-Jitsu</Label>
+          <Input
+            id="inicio-jiu-jitsu"
+            type="date"
+            value={inicioJiuJitsu}
+            onChange={(e) => setInicioJiuJitsu(e.target.value)}
+          />
+          <p className="mt-1 font-mono text-[11px] text-rope-dim">
+            Desde quando você pratica, mesmo que tenha sido em outra academia.
+          </p>
         </div>
 
         {camposQuery.data?.map((campo) => {

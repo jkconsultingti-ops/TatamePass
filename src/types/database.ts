@@ -29,6 +29,9 @@ export type Profile = {
   turma_principal_id: string | null
   identificador_tipo: IdentificadorTipo | null
   identificador_valor: string | null
+  associado_desde: string | null
+  inicio_jiu_jitsu: string | null
+  revisado_pelo_professor: boolean
   criado_em: string
 }
 
@@ -169,6 +172,10 @@ export type Database = {
       resolve_convite: {
         Args: { p_codigo: string }
         Returns: { academia_id: string; nome: string; role: UserRole }[]
+      }
+      excluir_aluno: {
+        Args: { p_aluno_id: string }
+        Returns: undefined
       }
     }
     Enums: Record<string, never>

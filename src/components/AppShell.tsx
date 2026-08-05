@@ -2,6 +2,8 @@ import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import { Stamp } from './Stamp'
+import { NotificacoesProfessor } from '../features/professor/NotificacoesProfessor'
+import { NotificacoesAluno } from '../features/aluno/NotificacoesAluno'
 
 interface AppShellProps {
   children: ReactNode
@@ -42,6 +44,8 @@ export function AppShell({ children, nav }: AppShellProps) {
             ))}
           </nav>
           <div className="flex items-center gap-3">
+            {profile?.role !== 'aluno' && <NotificacoesProfessor />}
+            {profile?.role === 'aluno' && <NotificacoesAluno />}
             <span className="hidden font-mono text-xs text-rope sm:inline">{profile?.nome}</span>
             <button
               type="button"

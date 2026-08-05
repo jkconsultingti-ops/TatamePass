@@ -9,9 +9,18 @@ const tones: Record<Tone, string> = {
   rope: 'border-rope/60 text-rope bg-rope/10',
 }
 
-export function Badge({ children, tone = 'neutral' }: { children: ReactNode; tone?: Tone }) {
+export function Badge({
+  children,
+  tone = 'neutral',
+  title,
+}: {
+  children: ReactNode
+  tone?: Tone
+  title?: string
+}) {
   return (
     <span
+      title={title}
       className={`inline-flex items-center rounded-full border px-2.5 py-0.5 font-mono text-[11px] uppercase tracking-wide ${tones[tone]}`}
     >
       {children}

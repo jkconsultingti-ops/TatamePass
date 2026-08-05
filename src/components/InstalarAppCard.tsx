@@ -5,9 +5,9 @@ import { usePromptInstalacaoDisponivel, solicitarInstalacao } from '../lib/insta
 const CHAVE_DISPENSADO = 'instalar-app-dispensado'
 
 const BENEFICIOS = [
-  'Abre direto da tela inicial, sem navegador',
-  'Funciona igual a um app baixado de loja',
-  'Ocupa pouco espaço e atualiza sozinho',
+  'Abre direto da tela inicial, sem precisar digitar o site',
+  'Fica com um ícone só seu, fácil de encontrar',
+  'Ocupa pouco espaço no celular',
 ]
 
 function appJaInstalado() {
@@ -38,8 +38,10 @@ export function InstalarAppCard() {
 
   useEffect(() => {
     const jaDispensado = localStorage.getItem(CHAVE_DISPENSADO) === '1'
-    setVisivel(!appJaInstalado() && !jaDispensado)
-  }, [])
+    // O passo a passo é sempre de celular (Android/iPhone) — em desktop não
+    // há instrução relevante pra mostrar, então o card nem aparece.
+    setVisivel(plataforma !== 'outro' && !appJaInstalado() && !jaDispensado)
+  }, [plataforma])
 
   if (!visivel) return null
 
@@ -76,18 +78,16 @@ export function InstalarAppCard() {
             <div className="min-w-0">
               <p className="font-mono text-[11px] uppercase tracking-wide text-mat-light">— Recomendado</p>
               <h2 className="mt-0.5 font-display text-base font-semibold text-chalk">
-                Instale o <span className="italic text-hanko">app</span> no seu celular
+                Adicionar <span className="italic text-hanko">atalho</span> no celular
               </h2>
-              <p className="mt-1 text-sm text-rope">
-                Abra direto da tela inicial, sem digitar o site — igual um aplicativo de verdade.
-              </p>
+              <p className="mt-1 text-sm text-rope">Abra direto da tela inicial.</p>
               <button
                 type="button"
                 onClick={() => setModalAberto(true)}
                 className="mt-4 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-hanko to-hanko-dark px-5 py-2.5 text-sm font-semibold text-paper shadow-sm transition-transform hover:scale-[1.02]"
               >
                 <Smartphone size={16} />
-                Ver como instalar
+                Ver como adicionar
               </button>
             </div>
           </div>
@@ -118,12 +118,9 @@ export function InstalarAppCard() {
             </div>
 
             <h2 className="mt-4 font-display text-xl font-semibold text-chalk">
-              Quer instalar o <span className="italic text-hanko">app</span>?
+              Adicionar <span className="italic text-hanko">atalho</span> na tela inicial?
             </h2>
-            <p className="mt-2 text-sm text-rope">
-              Adicione na tela inicial do seu celular — abre direto, sem navegador, igual um
-              aplicativo baixado de loja.
-            </p>
+            <p className="mt-2 text-sm text-rope">Adicione na tela inicial do seu celular.</p>
 
             <div className="mt-4 space-y-2 rounded-lg bg-ink p-4">
               {BENEFICIOS.map((item) => (
@@ -138,7 +135,7 @@ export function InstalarAppCard() {
               <>
                 <p className="mt-4 text-xs text-rope">
                   <strong className="text-chalk">Próximo passo:</strong> o celular vai perguntar se
-                  quer instalar. Toque em "Instalar".
+                  quer adicionar. Toque em "Instalar" quando aparecer.
                 </p>
                 <div className="mt-4 flex gap-3">
                   <button
@@ -153,7 +150,7 @@ export function InstalarAppCard() {
                     onClick={instalarAgora}
                     className="flex-1 rounded-full bg-gradient-to-r from-hanko to-hanko-dark py-2.5 text-sm font-semibold text-paper"
                   >
-                    Instalar agora
+                    Adicionar agora
                   </button>
                 </div>
               </>
@@ -167,8 +164,8 @@ export function InstalarAppCard() {
                       </p>
                       <ol className="mt-2 list-decimal space-y-1 pl-4 text-sm text-chalk">
                         <li>Toque no menu ⋮ no canto superior direito</li>
-                        <li>Toque em "Instalar aplicativo" (ou "Adicionar à tela inicial")</li>
-                        <li>Confirme em "Instalar"</li>
+                        <li>Toque em "Adicionar à tela inicial" (ou "Instalar aplicativo")</li>
+                        <li>Confirme em "Instalar" ou "Adicionar"</li>
                       </ol>
                     </div>
                   )}

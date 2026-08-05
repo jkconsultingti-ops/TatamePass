@@ -76,6 +76,7 @@ export function ConviteEntrar() {
           foto_url: foto,
           identificador_tipo: tipo,
           identificador_valor: valor,
+          revisado_pelo_professor: convite!.role !== 'aluno',
         })
         if (error) throw error
 

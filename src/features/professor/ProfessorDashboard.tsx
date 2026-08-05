@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
@@ -7,8 +7,11 @@ import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
 import { hojeISO } from '../../lib/checkin'
 import { useAulasCanceladas, aulaCanceladaEm } from '../../lib/aulas'
+import { useFaixasConfig, faixasDoTipo, estadoAtual, statusProgresso } from '../../lib/graduacao'
+import { statusExameMedico } from '../../lib/exameMedico'
 import { InstalarAppCard } from '../../components/InstalarAppCard'
-import type { Profile, Checkin, Turma, AulaCancelada } from '../../types/database'
+import { GraficoFaixas } from './GraficoFaixas'
+import type { Profile, Checkin, Turma, AulaCancelada, ExameMedico, Graduacao } from '../../types/database'
 
 export function ProfessorDashboard() {
   const { profile } = useAuth()
@@ -45,12 +48,105 @@ export function ProfessorDashboard() {
     enabled: !!profile,
   })
 
+  const examesQuery = useQuery({
+    queryKey: ['exames_medicos', profile?.academia_id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('exames_medicos').select('*')
+      if (error) throw error
+      return data as ExameMedico[]
+    },
+    enabled: !!profile,
+  })
+
+  const graduacoesQuery = useQuery({
+    queryKey: ['graduacoes-todas', profile?.academia_id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('graduacoes').select('*')
+      if (error) throw error
+      return data as Graduacao[]
+    },
+    enabled: !!profile,
+  })
+
+  const faixasQuery = useFaixasConfig()
   const canceladasQuery = useAulasCanceladas(profile?.academia_id)
 
   const turmasHoje = useMemo(() => {
     const hoje = new Date().getDay()
     return (turmasQuery.data ?? []).filter((t) => t.dias_semana.includes(hoje))
   }, [turmasQuery.data])
+
+  const alertasExame = useMemo(() => {
+    const porAluno = new Map((examesQuery.data ?? []).map((e) => [e.aluno_id, e]))
+    let vencidos = 0
+    let venceEmBreve = 0
+    for (const aluno of alunosQuery.data ?? []) {
+      const status = statusExameMedico(porAluno.get(aluno.id))
+      if (status === 'vencido') vencidos += 1
+      if (status === 'vence-em-breve') venceEmBreve += 1
+    }
+    return { vencidos, venceEmBreve }
+  }, [examesQuery.data, alunosQuery.data])
+
+  const turmaPorId = useMemo(
+    () => new Map((turmasQuery.data ?? []).map((t) => [t.id, t])),
+    [turmasQuery.data],
+  )
+
+  const graduacoesPorAluno = useMemo(() => {
+    const mapa = new Map<string, Graduacao[]>()
+    for (const g of graduacoesQuery.data ?? []) {
+      const lista = mapa.get(g.aluno_id) ?? []
+      lista.push(g)
+      mapa.set(g.aluno_id, lista)
+    }
+    return mapa
+  }, [graduacoesQuery.data])
+
+  // Faixa/grau atual + elegibilidade de cada aluno — mesmo cálculo usado em
+  // ProfessorGraduacao.tsx, refeito aqui só pra alimentar o tile "Elegíveis".
+  const checkinsTotaisQuery = useQuery({
+    queryKey: ['checkins-todos', profile?.academia_id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('checkins').select('*')
+      if (error) throw error
+      return data as Checkin[]
+    },
+    enabled: !!profile,
+  })
+
+  const checkinsPorAluno = useMemo(() => {
+    const mapa = new Map<string, Checkin[]>()
+    for (const c of checkinsTotaisQuery.data ?? []) {
+      const lista = mapa.get(c.aluno_id) ?? []
+      lista.push(c)
+      mapa.set(c.aluno_id, lista)
+    }
+    return mapa
+  }, [checkinsTotaisQuery.data])
+
+  const roster = useMemo(() => {
+    const faixasTodas = faixasQuery.data ?? []
+    if (faixasTodas.length === 0) return []
+    return (alunosQuery.data ?? []).flatMap((aluno) => {
+      const turma = aluno.turma_principal_id ? turmaPorId.get(aluno.turma_principal_id) : undefined
+      const faixasDoAluno = faixasDoTipo(faixasTodas, turma?.tipo_turma ?? 'adulto')
+      if (faixasDoAluno.length === 0) return []
+      const estado = estadoAtual(graduacoesPorAluno.get(aluno.id) ?? [], faixasDoAluno, aluno.criado_em)!
+      const checkinsDesde = (checkinsPorAluno.get(aluno.id) ?? []).filter((c) => c.data > estado.desde)
+      const status = statusProgresso(estado, faixasDoAluno, checkinsDesde)
+      return [{ aluno, estado, status }]
+    })
+  }, [alunosQuery.data, faixasQuery.data, graduacoesPorAluno, checkinsPorAluno, turmaPorId])
+
+  const elegiveis = useMemo(() => roster.filter((r) => r.status.elegivel).length, [roster])
+
+  const distribuicaoFaixas = useMemo(() => {
+    const faixasAdulto = faixasDoTipo(faixasQuery.data ?? [], 'adulto')
+    const contagem = new Map<string, number>()
+    for (const r of roster) contagem.set(r.estado.faixa.id, (contagem.get(r.estado.faixa.id) ?? 0) + 1)
+    return faixasAdulto.map((f) => ({ nome: f.nome, quantidade: contagem.get(f.id) ?? 0 }))
+  }, [faixasQuery.data, roster])
 
   async function invalidarCanceladas() {
     await queryClient.invalidateQueries({ queryKey: ['aulas_canceladas', profile?.academia_id] })
@@ -89,20 +185,34 @@ export function ProfessorDashboard() {
 
       <h1 className="font-display text-2xl font-semibold text-chalk">Painel</h1>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card>
-          <p className="font-mono text-xs uppercase tracking-wide text-rope">Alunos</p>
-          <p className="mt-1 font-display text-3xl text-chalk">{alunosQuery.data?.length ?? '—'}</p>
-        </Card>
-        <Card>
-          <p className="font-mono text-xs uppercase tracking-wide text-rope">Check-ins hoje</p>
-          <p className="mt-1 font-display text-3xl text-hanko">
-            {checkinsHojeQuery.data?.length ?? '—'}
-          </p>
-        </Card>
-        <Card>
-          <p className="font-mono text-xs uppercase tracking-wide text-rope">Turmas hoje</p>
-          <p className="mt-1 font-display text-3xl text-chalk">{turmasHoje.length}</p>
+      <div className="flex flex-col gap-4 lg:flex-row">
+        <div className="grid flex-1 grid-cols-2 gap-4 sm:grid-cols-3">
+          <StatTile valor={alunosQuery.data?.length ?? '—'} rotulo="Alunos" />
+
+          <StatTile valor={checkinsHojeQuery.data?.length ?? '—'} corValor="text-hanko" rotulo="Check-ins hoje" />
+
+          <StatTile valor={turmasHoje.length} rotulo="Turmas hoje" />
+
+          <StatTile valor={alertasExame.vencidos} corValor="text-hanko" rotulo="Exames vencidos">
+            {alertasExame.venceEmBreve > 0 && (
+              <p className="font-mono text-xs text-rope">+{alertasExame.venceEmBreve} vencendo</p>
+            )}
+          </StatTile>
+
+          <StatTile valor={elegiveis} corValor="text-mat" rotulo="Elegíveis pra graduar">
+            {elegiveis > 0 && (
+              <Link to="/professor/graduacao" className="font-mono text-xs text-hanko hover:underline">
+                ver na Graduação →
+              </Link>
+            )}
+          </StatTile>
+        </div>
+
+        <Card className="flex flex-col gap-3 lg:w-72">
+          <h2 className="font-mono text-xs uppercase tracking-[0.14em] text-rope">Distribuição de faixas</h2>
+          <div className="flex flex-1 flex-col justify-center gap-2">
+            <GraficoFaixas dados={distribuicaoFaixas} />
+          </div>
         </Card>
       </div>
 
@@ -132,6 +242,26 @@ export function ProfessorDashboard() {
         </Link>
       </div>
     </div>
+  )
+}
+
+function StatTile({
+  valor,
+  corValor = 'text-chalk',
+  rotulo,
+  children,
+}: {
+  valor: ReactNode
+  corValor?: string
+  rotulo: string
+  children?: ReactNode
+}) {
+  return (
+    <Card className="flex h-full flex-col items-center gap-1 p-4 text-center">
+      <p className={`font-display text-2xl ${corValor}`}>{valor}</p>
+      <p className="font-mono text-xs uppercase tracking-wide text-rope">{rotulo}</p>
+      <div className="flex min-h-9 flex-col items-center justify-center gap-0.5">{children}</div>
+    </Card>
   )
 }
 

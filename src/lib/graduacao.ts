@@ -33,7 +33,10 @@ export function estadoAtual(
   criadoEm: string,
 ): EstadoGraduacao | null {
   if (faixasOrdenadas.length === 0) return null
-  const ultima = [...graduacoes].sort((a, b) => b.concedido_em.localeCompare(a.concedido_em))[0]
+  const ultima = [...graduacoes].sort((a, b) => {
+    const porData = b.concedido_em.localeCompare(a.concedido_em)
+    return porData !== 0 ? porData : b.criado_em.localeCompare(a.criado_em)
+  })[0]
   if (!ultima) return { faixa: faixasOrdenadas[0], grau: 0, desde: criadoEm }
   const faixa = faixasOrdenadas.find((f) => f.id === ultima.faixa_id)
   if (!faixa) return { faixa: faixasOrdenadas[0], grau: 0, desde: criadoEm }
