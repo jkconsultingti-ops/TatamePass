@@ -1,10 +1,12 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import { format, startOfMonth } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../auth/AuthProvider'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
+import { Meter } from '../../components/Meter'
 import { hojeISO } from '../../lib/checkin'
 import { useAulasCanceladas, aulaCanceladaEm } from '../../lib/aulas'
 import { useFaixasConfig, faixasDoTipo, estadoAtual, statusProgresso } from '../../lib/graduacao'
@@ -148,6 +150,20 @@ export function ProfessorDashboard() {
     return faixasAdulto.map((f) => ({ nome: f.nome, quantidade: contagem.get(f.id) ?? 0 }))
   }, [faixasQuery.data, roster])
 
+  const checkinsPorTurmaMes = useMemo(() => {
+    const inicioMes = format(startOfMonth(new Date()), 'yyyy-MM-dd')
+    const porTurma = new Map<string, number>()
+    for (const c of checkinsTotaisQuery.data ?? []) {
+      if (c.data < inicioMes) continue
+      porTurma.set(c.turma_id, (porTurma.get(c.turma_id) ?? 0) + 1)
+    }
+    return (turmasQuery.data ?? [])
+      .map((t) => ({ nome: t.nome, quantidade: porTurma.get(t.id) ?? 0 }))
+      .sort((a, b) => b.quantidade - a.quantidade)
+  }, [checkinsTotaisQuery.data, turmasQuery.data])
+
+  const maiorCheckinTurmaMes = Math.max(1, ...checkinsPorTurmaMes.map((t) => t.quantidade))
+
   async function invalidarCanceladas() {
     await queryClient.invalidateQueries({ queryKey: ['aulas_canceladas', profile?.academia_id] })
   }
@@ -231,6 +247,20 @@ export function ProfessorDashboard() {
           {turmasHoje.length === 0 && <Card className="text-sm text-rope">Nenhuma turma hoje.</Card>}
         </div>
         {erro && <p className="mt-2 font-mono text-xs text-hanko">{erro}</p>}
+      </section>
+
+      <section>
+        <h2 className="font-mono text-xs uppercase tracking-[0.14em] text-rope">Check-ins por turma este mês</h2>
+        <Card className="mt-3 flex flex-col gap-3">
+          {checkinsPorTurmaMes.map((t) => (
+            <div key={t.nome} className="flex items-center gap-3">
+              <p className="w-28 shrink-0 truncate text-sm text-chalk sm:w-40">{t.nome}</p>
+              <Meter fracao={t.quantidade / maiorCheckinTurmaMes} className="flex-1" />
+              <span className="w-8 shrink-0 text-right text-sm font-semibold text-chalk">{t.quantidade}</span>
+            </div>
+          ))}
+          {checkinsPorTurmaMes.length === 0 && <p className="text-sm text-rope">Nenhuma turma cadastrada.</p>}
+        </Card>
       </section>
 
       <div className="flex gap-4">
