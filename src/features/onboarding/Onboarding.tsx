@@ -49,7 +49,7 @@ export function Onboarding() {
   return (
     <div className="flex min-h-svh flex-col items-center justify-center bg-ink px-6 py-12">
       <Stamp className="h-14 w-14 text-hanko" />
-      <Card className="mt-6 w-full max-w-sm">
+      <Card className="mt-6 w-full max-w-lg">
         <h1 className="font-display text-2xl font-semibold text-chalk">Criar academia</h1>
         <p className="mt-1 text-sm text-rope">
           Você vira o admin dessa academia — depois é só mandar o link de convite pros professores e
