@@ -389,7 +389,7 @@ export function ProfessorAlunoDetalhe() {
                 id="turma-principal-professor"
                 value={assocForm.turma_principal_id}
                 onChange={(e) => setAssocForm((v) => ({ ...v, turma_principal_id: e.target.value }))}
-                className="w-full rounded-sm border border-rope-dim/50 bg-ink px-3.5 py-2.5 text-sm text-chalk focus:border-hanko focus:outline-none focus:ring-1 focus:ring-hanko"
+                className="w-full rounded-sm border border-rope-dim/80 bg-ink px-3.5 py-2.5 text-sm text-chalk focus:border-hanko focus:outline-none focus:ring-1 focus:ring-hanko"
               >
                 <option value="">Nenhuma</option>
                 {turmasQuery.data?.map((t) => (
@@ -446,7 +446,7 @@ export function ProfessorAlunoDetalhe() {
                     id="manual-faixa"
                     value={manual.faixaId}
                     onChange={(e) => setManual((m) => ({ ...m!, faixaId: e.target.value }))}
-                    className="w-full rounded-sm border border-rope-dim/50 bg-ink px-3.5 py-2.5 text-sm text-chalk focus:border-hanko focus:outline-none focus:ring-1 focus:ring-hanko"
+                    className="w-full rounded-sm border border-rope-dim/80 bg-ink px-3.5 py-2.5 text-sm text-chalk focus:border-hanko focus:outline-none focus:ring-1 focus:ring-hanko"
                   >
                     {faixasDoAluno.map((f) => (
                       <option key={f.id} value={f.id}>

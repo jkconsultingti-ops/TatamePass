@@ -10,7 +10,7 @@ export function Label({ className = '', ...props }: LabelHTMLAttributes<HTMLLabe
 }
 
 const fieldStyles =
-  'w-full rounded-sm border border-rope-dim/50 bg-ink px-3.5 py-2.5 text-sm text-chalk placeholder:text-rope-dim/70 focus:border-hanko focus:outline-none focus:ring-1 focus:ring-hanko'
+  'w-full rounded-sm border border-rope-dim/80 bg-ink px-3.5 py-2.5 text-sm text-chalk placeholder:text-rope-dim/70 focus:border-hanko focus:outline-none focus:ring-1 focus:ring-hanko'
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   ({ className = '', ...props }, ref) => (

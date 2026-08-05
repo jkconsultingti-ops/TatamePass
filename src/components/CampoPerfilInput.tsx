@@ -87,7 +87,7 @@ export function CampoPerfilInput({
           id={campo.id}
           value={valor}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full max-w-sm rounded-sm border border-rope-dim/50 bg-ink px-3.5 py-2.5 text-sm text-chalk focus:border-hanko focus:outline-none focus:ring-1 focus:ring-hanko"
+          className="w-full max-w-sm rounded-sm border border-rope-dim/80 bg-ink px-3.5 py-2.5 text-sm text-chalk focus:border-hanko focus:outline-none focus:ring-1 focus:ring-hanko"
         >
           <option value="">Selecione</option>
           {(campo.opcoes ?? []).map((opcao) => (
