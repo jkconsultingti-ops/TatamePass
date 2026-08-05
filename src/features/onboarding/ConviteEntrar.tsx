@@ -153,7 +153,7 @@ function ConviteShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-svh flex-col items-center justify-center bg-ink px-6 py-12 text-center">
       <Stamp className="h-14 w-14 text-hanko" />
-      <Card className="mt-6 w-full max-w-lg text-left">{children}</Card>
+      <Card className="mt-6 w-full max-w-sm text-left">{children}</Card>
     </div>
   )
 }

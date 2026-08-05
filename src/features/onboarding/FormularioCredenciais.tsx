@@ -61,7 +61,7 @@ export function FormularioCredenciais({
   }
 
   return (
-    <div className="w-full max-w-lg text-left">
+    <div className="w-full max-w-sm text-left">
       <div className="mb-5 flex gap-1 rounded-sm border border-rope-dim/40 p-1">
         <button
           type="button"

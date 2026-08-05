@@ -16,7 +16,7 @@ export function Login() {
       {/* w-full aqui é obrigatório: o pai é flex + items-center, então este
           filho encolheria até o conteúdo e o max-w do formulário nunca
           valeria (largura percentual sobre um pai sem largura). */}
-      <div className="mt-10 w-full max-w-lg">
+      <div className="mt-10 w-full max-w-sm">
         <FormularioCredenciais />
       </div>
 
