@@ -1,14 +1,27 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import { format, startOfMonth } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../auth/AuthProvider'
 import { Card } from '../../components/Card'
 import { Button } from '../../components/Button'
+import { Meter } from '../../components/Meter'
 import { hojeISO } from '../../lib/checkin'
 import { useAulasCanceladas, aulaCanceladaEm } from '../../lib/aulas'
+import { useFaixasConfig, faixasDoTipo, estadoAtual, statusProgresso } from '../../lib/graduacao'
+import { statusExameMedico } from '../../lib/exameMedico'
 import { InstalarAppCard } from '../../components/InstalarAppCard'
-import type { Profile, Checkin, Turma, Academia, AulaCancelada } from '../../types/database'
+import { GraficoFaixas } from '../professor/GraficoFaixas'
+import type {
+  Profile,
+  Checkin,
+  Turma,
+  Academia,
+  AulaCancelada,
+  ExameMedico,
+  Graduacao,
+} from '../../types/database'
 
 export function AdminDashboard() {
   const { profile } = useAuth()
@@ -61,10 +74,118 @@ export function AdminDashboard() {
 
   const canceladasQuery = useAulasCanceladas(profile?.academia_id)
 
+  const examesQuery = useQuery({
+    queryKey: ['exames_medicos', profile?.academia_id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('exames_medicos').select('*')
+      if (error) throw error
+      return data as ExameMedico[]
+    },
+    enabled: !!profile,
+  })
+
+  const graduacoesQuery = useQuery({
+    queryKey: ['graduacoes-todas', profile?.academia_id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('graduacoes').select('*')
+      if (error) throw error
+      return data as Graduacao[]
+    },
+    enabled: !!profile,
+  })
+
+  const checkinsTotaisQuery = useQuery({
+    queryKey: ['checkins-todos', profile?.academia_id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('checkins').select('*')
+      if (error) throw error
+      return data as Checkin[]
+    },
+    enabled: !!profile,
+  })
+
+  const faixasQuery = useFaixasConfig()
+
   const turmasHoje = useMemo(() => {
     const hoje = new Date().getDay()
     return (turmasQuery.data ?? []).filter((t) => t.dias_semana.includes(hoje))
   }, [turmasQuery.data])
+
+  const alertasExame = useMemo(() => {
+    const porAluno = new Map((examesQuery.data ?? []).map((e) => [e.aluno_id, e]))
+    let vencidos = 0
+    let venceEmBreve = 0
+    for (const aluno of alunosQuery.data ?? []) {
+      const status = statusExameMedico(porAluno.get(aluno.id))
+      if (status === 'vencido') vencidos += 1
+      if (status === 'vence-em-breve') venceEmBreve += 1
+    }
+    return { vencidos, venceEmBreve }
+  }, [examesQuery.data, alunosQuery.data])
+
+  const turmaPorId = useMemo(
+    () => new Map((turmasQuery.data ?? []).map((t) => [t.id, t])),
+    [turmasQuery.data],
+  )
+
+  const graduacoesPorAluno = useMemo(() => {
+    const mapa = new Map<string, Graduacao[]>()
+    for (const g of graduacoesQuery.data ?? []) {
+      const lista = mapa.get(g.aluno_id) ?? []
+      lista.push(g)
+      mapa.set(g.aluno_id, lista)
+    }
+    return mapa
+  }, [graduacoesQuery.data])
+
+  const checkinsPorAluno = useMemo(() => {
+    const mapa = new Map<string, Checkin[]>()
+    for (const c of checkinsTotaisQuery.data ?? []) {
+      const lista = mapa.get(c.aluno_id) ?? []
+      lista.push(c)
+      mapa.set(c.aluno_id, lista)
+    }
+    return mapa
+  }, [checkinsTotaisQuery.data])
+
+  // Faixa/grau atual + elegibilidade de cada aluno — mesmo cálculo usado em
+  // ProfessorGraduacao.tsx, refeito aqui só pra alimentar o tile "Elegíveis".
+  const roster = useMemo(() => {
+    const faixasTodas = faixasQuery.data ?? []
+    if (faixasTodas.length === 0) return []
+    return (alunosQuery.data ?? []).flatMap((aluno) => {
+      const turma = aluno.turma_principal_id ? turmaPorId.get(aluno.turma_principal_id) : undefined
+      const faixasDoAluno = faixasDoTipo(faixasTodas, turma?.tipo_turma ?? 'adulto')
+      if (faixasDoAluno.length === 0) return []
+      const estado = estadoAtual(graduacoesPorAluno.get(aluno.id) ?? [], faixasDoAluno, aluno.criado_em)!
+      const checkinsDesde = (checkinsPorAluno.get(aluno.id) ?? []).filter((c) => c.data > estado.desde)
+      const status = statusProgresso(estado, faixasDoAluno, checkinsDesde)
+      return [{ aluno, estado, status }]
+    })
+  }, [alunosQuery.data, faixasQuery.data, graduacoesPorAluno, checkinsPorAluno, turmaPorId])
+
+  const elegiveis = useMemo(() => roster.filter((r) => r.status.elegivel).length, [roster])
+
+  const distribuicaoFaixas = useMemo(() => {
+    const faixasAdulto = faixasDoTipo(faixasQuery.data ?? [], 'adulto')
+    const contagem = new Map<string, number>()
+    for (const r of roster) contagem.set(r.estado.faixa.id, (contagem.get(r.estado.faixa.id) ?? 0) + 1)
+    return faixasAdulto.map((f) => ({ nome: f.nome, quantidade: contagem.get(f.id) ?? 0 }))
+  }, [faixasQuery.data, roster])
+
+  const checkinsPorTurmaMes = useMemo(() => {
+    const inicioMes = format(startOfMonth(new Date()), 'yyyy-MM-dd')
+    const porTurma = new Map<string, number>()
+    for (const c of checkinsTotaisQuery.data ?? []) {
+      if (c.data < inicioMes) continue
+      porTurma.set(c.turma_id, (porTurma.get(c.turma_id) ?? 0) + 1)
+    }
+    return (turmasQuery.data ?? [])
+      .map((t) => ({ nome: t.nome, quantidade: porTurma.get(t.id) ?? 0 }))
+      .sort((a, b) => b.quantidade - a.quantidade)
+  }, [checkinsTotaisQuery.data, turmasQuery.data])
+
+  const maiorCheckinTurmaMes = Math.max(1, ...checkinsPorTurmaMes.map((t) => t.quantidade))
 
   async function invalidarCanceladas() {
     await queryClient.invalidateQueries({ queryKey: ['aulas_canceladas', profile?.academia_id] })
@@ -113,20 +234,47 @@ export function AdminDashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card>
-          <p className="font-mono text-xs uppercase tracking-wide text-rope">Alunos</p>
-          <p className="mt-1 font-display text-3xl text-chalk">{alunosQuery.data?.length ?? '—'}</p>
-        </Card>
-        <Card>
-          <p className="font-mono text-xs uppercase tracking-wide text-rope">Check-ins hoje</p>
-          <p className="mt-1 font-display text-3xl text-hanko">
-            {checkinsHojeQuery.data?.length ?? '—'}
-          </p>
-        </Card>
-        <Card>
-          <p className="font-mono text-xs uppercase tracking-wide text-rope">Turmas hoje</p>
-          <p className="mt-1 font-display text-3xl text-chalk">{turmasHoje.length}</p>
+      <div className="flex flex-col gap-4 lg:flex-row">
+        <div className="grid flex-1 grid-cols-2 gap-4 sm:grid-cols-3">
+          <Card className="flex h-full flex-col items-center gap-1 p-4 text-center">
+            <p className="font-display text-2xl text-chalk">{alunosQuery.data?.length ?? '—'}</p>
+            <p className="font-mono text-xs uppercase tracking-wide text-rope">Alunos</p>
+          </Card>
+          <Card className="flex h-full flex-col items-center gap-1 p-4 text-center">
+            <p className="font-display text-2xl text-hanko">{checkinsHojeQuery.data?.length ?? '—'}</p>
+            <p className="font-mono text-xs uppercase tracking-wide text-rope">Check-ins hoje</p>
+          </Card>
+          <Card className="flex h-full flex-col items-center gap-1 p-4 text-center">
+            <p className="font-display text-2xl text-chalk">{turmasHoje.length}</p>
+            <p className="font-mono text-xs uppercase tracking-wide text-rope">Turmas hoje</p>
+          </Card>
+          <Card className="flex h-full flex-col items-center gap-1 p-4 text-center">
+            <p className="font-display text-2xl text-hanko">{alertasExame.vencidos}</p>
+            <p className="font-mono text-xs uppercase tracking-wide text-rope">Exames vencidos</p>
+            <div className="flex min-h-9 flex-col items-center justify-center gap-0.5">
+              {alertasExame.venceEmBreve > 0 && (
+                <p className="font-mono text-xs text-rope">+{alertasExame.venceEmBreve} vencendo</p>
+              )}
+            </div>
+          </Card>
+          <Card className="flex h-full flex-col items-center gap-1 p-4 text-center">
+            <p className="font-display text-2xl text-mat">{elegiveis}</p>
+            <p className="font-mono text-xs uppercase tracking-wide text-rope">Elegíveis pra graduar</p>
+            <div className="flex min-h-9 flex-col items-center justify-center gap-0.5">
+              {elegiveis > 0 && (
+                <Link to="/admin/graduacao" className="font-mono text-xs text-hanko hover:underline">
+                  ver na Graduação →
+                </Link>
+              )}
+            </div>
+          </Card>
+        </div>
+
+        <Card className="flex flex-col gap-3 lg:w-72">
+          <h2 className="font-mono text-xs uppercase tracking-[0.14em] text-rope">Distribuição de faixas</h2>
+          <div className="flex flex-1 flex-col justify-center gap-2">
+            <GraficoFaixas dados={distribuicaoFaixas} />
+          </div>
         </Card>
       </div>
 
@@ -145,6 +293,20 @@ export function AdminDashboard() {
           {turmasHoje.length === 0 && <Card className="text-sm text-rope">Nenhuma turma hoje.</Card>}
         </div>
         {erro && <p className="mt-2 font-mono text-xs text-hanko">{erro}</p>}
+      </section>
+
+      <section>
+        <h2 className="font-mono text-xs uppercase tracking-[0.14em] text-rope">Check-ins por turma este mês</h2>
+        <Card className="mt-3 flex flex-col gap-3">
+          {checkinsPorTurmaMes.map((t) => (
+            <div key={t.nome} className="flex items-center gap-3">
+              <p className="w-28 shrink-0 truncate text-sm text-chalk sm:w-40">{t.nome}</p>
+              <Meter fracao={t.quantidade / maiorCheckinTurmaMes} className="flex-1" />
+              <span className="w-8 shrink-0 text-right text-sm font-semibold text-chalk">{t.quantidade}</span>
+            </div>
+          ))}
+          {checkinsPorTurmaMes.length === 0 && <p className="text-sm text-rope">Nenhuma turma cadastrada.</p>}
+        </Card>
       </section>
 
       <div className="flex flex-wrap gap-4">
