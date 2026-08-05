@@ -2,8 +2,17 @@ import { forwardRef, type ButtonHTMLAttributes } from 'react'
 
 type Variant = 'primary' | 'secondary' | 'ghost'
 
+/** Mesma ideia do TamanhoCampo em Field.tsx: 'md' é o padrão do app,
+ * 'lg' só nas telas de entrada. */
+type Tamanho = 'md' | 'lg'
+
 const base =
-  'inline-flex items-center justify-center gap-2 rounded-sm px-5 py-2.5 text-sm font-medium transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-40'
+  'inline-flex items-center justify-center gap-2 rounded-sm font-medium transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-40'
+
+const sizes: Record<Tamanho, string> = {
+  md: 'px-5 py-2.5 text-sm',
+  lg: 'px-6 py-3.5 text-base',
+}
 
 const variants: Record<Variant, string> = {
   primary:
@@ -15,11 +24,16 @@ const variants: Record<Variant, string> = {
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant
+  tamanho?: Tamanho
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = 'primary', className = '', ...props }, ref) => (
-    <button ref={ref} className={`${base} ${variants[variant]} ${className}`} {...props} />
+  ({ variant = 'primary', tamanho = 'md', className = '', ...props }, ref) => (
+    <button
+      ref={ref}
+      className={`${base} ${sizes[tamanho]} ${variants[variant]} ${className}`}
+      {...props}
+    />
   ),
 )
 Button.displayName = 'Button'

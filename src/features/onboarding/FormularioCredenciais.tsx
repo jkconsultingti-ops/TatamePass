@@ -66,7 +66,7 @@ export function FormularioCredenciais({
         <button
           type="button"
           onClick={() => trocarModo('entrar')}
-          className={`flex-1 rounded-sm py-2 font-mono text-xs uppercase tracking-wide transition-colors ${
+          className={`flex-1 rounded-sm py-2.5 font-mono text-sm uppercase tracking-wide transition-colors ${
             modo === 'entrar' ? 'bg-hanko/15 text-hanko' : 'text-rope hover:text-chalk'
           }`}
         >
@@ -75,7 +75,7 @@ export function FormularioCredenciais({
         <button
           type="button"
           onClick={() => trocarModo('criar-conta')}
-          className={`flex-1 rounded-sm py-2 font-mono text-xs uppercase tracking-wide transition-colors ${
+          className={`flex-1 rounded-sm py-2.5 font-mono text-sm uppercase tracking-wide transition-colors ${
             modo === 'criar-conta' ? 'bg-hanko/15 text-hanko' : 'text-rope hover:text-chalk'
           }`}
         >
@@ -83,11 +83,14 @@ export function FormularioCredenciais({
         </button>
       </div>
 
-      <form className="flex flex-col gap-4" onSubmit={handleSubmit(onSubmit)}>
+      <form className="flex flex-col gap-5" onSubmit={handleSubmit(onSubmit)}>
         <div>
-          <Label htmlFor="identificador">E-mail ou telefone</Label>
+          <Label htmlFor="identificador" tamanho="lg">
+            E-mail ou telefone
+          </Label>
           <Input
             id="identificador"
+            tamanho="lg"
             placeholder="voce@exemplo.com ou (19) 99999-9999"
             autoComplete="username"
             {...register('identificador')}
@@ -95,9 +98,12 @@ export function FormularioCredenciais({
           <FieldError>{errors.identificador?.message}</FieldError>
         </div>
         <div>
-          <Label htmlFor="senha">Senha</Label>
+          <Label htmlFor="senha" tamanho="lg">
+            Senha
+          </Label>
           <Input
             id="senha"
+            tamanho="lg"
             type="password"
             autoComplete={modo === 'entrar' ? 'current-password' : 'new-password'}
             {...register('senha')}
@@ -106,7 +112,7 @@ export function FormularioCredenciais({
         </div>
         <FieldError>{erro ?? undefined}</FieldError>
         {mensagem && <p className="font-mono text-xs text-mat-light">{mensagem}</p>}
-        <Button type="submit" disabled={isSubmitting}>
+        <Button type="submit" tamanho="lg" disabled={isSubmitting}>
           {isSubmitting ? 'Aguarde…' : modo === 'entrar' ? 'Entrar' : 'Criar conta'}
         </Button>
       </form>
@@ -117,7 +123,7 @@ export function FormularioCredenciais({
         <span className="h-px flex-1 bg-rope-dim/30" />
       </div>
 
-      <Button variant="secondary" onClick={() => signInWithGoogle()} className="w-full">
+      <Button variant="secondary" tamanho="lg" onClick={() => signInWithGoogle()} className="w-full">
         Entrar com Google
       </Button>
     </div>

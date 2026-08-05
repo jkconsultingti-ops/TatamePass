@@ -56,7 +56,7 @@ export function Onboarding() {
           alunos.
         </p>
         <form
-          className="mt-6 flex flex-col gap-4"
+          className="mt-6 flex flex-col gap-5"
           onSubmit={handleSubmit(async ({ nome, seuNome }) => {
             setErro(null)
             try {
@@ -97,17 +97,26 @@ export function Onboarding() {
           })}
         >
           <div>
-            <Label htmlFor="nome-academia">Nome da academia</Label>
-            <Input id="nome-academia" placeholder="Ex: Gracie Barra Centro" {...register('nome')} />
+            <Label htmlFor="nome-academia" tamanho="lg">
+              Nome da academia
+            </Label>
+            <Input
+              id="nome-academia"
+              tamanho="lg"
+              placeholder="Ex: Gracie Barra Centro"
+              {...register('nome')}
+            />
             <FieldError>{errors.nome?.message}</FieldError>
           </div>
           <div>
-            <Label htmlFor="seu-nome">Seu nome</Label>
-            <Input id="seu-nome" {...register('seuNome')} />
+            <Label htmlFor="seu-nome" tamanho="lg">
+              Seu nome
+            </Label>
+            <Input id="seu-nome" tamanho="lg" {...register('seuNome')} />
             <FieldError>{errors.seuNome?.message}</FieldError>
           </div>
           <FieldError>{erro ?? undefined}</FieldError>
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" tamanho="lg" disabled={isSubmitting}>
             {isSubmitting ? 'Criando…' : 'Criar academia'}
           </Button>
         </form>
