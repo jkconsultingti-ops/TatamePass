@@ -128,7 +128,7 @@ export function AdminMarca() {
                 setCor(e.target.value)
                 setCorSugerida(false)
               }}
-              className="h-10 w-14 cursor-pointer rounded-sm border border-rope-dim/80 bg-ink p-1"
+              className="h-10 w-14 cursor-pointer rounded-sm border border-rope-dim/50 bg-ink p-1"
             />
             <span className="font-mono text-sm text-rope">{cor}</span>
           </div>

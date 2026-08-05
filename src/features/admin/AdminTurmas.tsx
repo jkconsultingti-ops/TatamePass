@@ -180,7 +180,7 @@ function TurmaFormulario({
           <Label htmlFor="tipo-turma">Tipo de turma</Label>
           <select
             id="tipo-turma"
-            className="w-full rounded-sm border border-rope-dim/80 bg-ink px-3.5 py-2.5 text-sm text-chalk focus:border-hanko focus:outline-none focus:ring-1 focus:ring-hanko"
+            className="w-full rounded-sm border border-rope-dim/50 bg-ink px-3.5 py-2.5 text-sm text-chalk focus:border-hanko focus:outline-none focus:ring-1 focus:ring-hanko"
             {...register('tipo_turma')}
           >
             {(['adulto', 'infantil'] satisfies TipoTurma[]).map((tipo) => (

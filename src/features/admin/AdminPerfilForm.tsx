@@ -243,7 +243,7 @@ export function AdminPerfilForm() {
         {criandoFormulario ? (
           <input
             autoFocus
-            className="w-40 rounded-sm border border-rope-dim/80 bg-ink px-2 py-1.5 text-sm text-chalk focus:border-hanko focus:outline-none"
+            className="w-40 rounded-sm border border-rope-dim/50 bg-ink px-2 py-1.5 text-sm text-chalk focus:border-hanko focus:outline-none"
             placeholder="Nome do formulário"
             onBlur={(e) => criarFormulario(e.target.value)}
             onKeyDown={(e) => {
@@ -397,7 +397,7 @@ function CampoCard({
         <select
           value={campo.tipo}
           onChange={(e) => mudarTipo(e.target.value as CampoTipo)}
-          className="rounded-sm border border-rope-dim/80 bg-ink px-2.5 py-1.5 text-xs text-chalk focus:border-hanko focus:outline-none"
+          className="rounded-sm border border-rope-dim/50 bg-ink px-2.5 py-1.5 text-xs text-chalk focus:border-hanko focus:outline-none"
         >
           {TIPOS_CAMPO.map((t) => (
             <option key={t.valor} value={t.valor}>

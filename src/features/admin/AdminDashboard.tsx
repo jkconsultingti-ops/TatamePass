@@ -225,7 +225,7 @@ function AulaHojeCard({
         <input
           autoFocus
           placeholder="Motivo (ex: feriado)"
-          className="w-48 rounded-sm border border-rope-dim/80 bg-ink px-2.5 py-1.5 text-sm text-chalk focus:border-hanko focus:outline-none"
+          className="w-48 rounded-sm border border-rope-dim/50 bg-ink px-2.5 py-1.5 text-sm text-chalk focus:border-hanko focus:outline-none"
           onBlur={(e) => {
             if (e.target.value.trim()) onCancelar(e.target.value)
             setCancelando(false)
